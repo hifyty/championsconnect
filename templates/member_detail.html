@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}{{ member.first_name }} {{ member.last_name }}{% endblock %}
+{% block page_title %}Member Profile{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('edit_member', member_id=member.id) }}" class="btn btn-gold">✏️ Edit</a>
+{% if session.get('role') == 'admin' %}
+<form method="POST" action="{{ url_for('delete_member', member_id=member.id) }}" onsubmit="return confirm('Remove this member?');">
+  <button type="submit" class="btn btn-danger">🗑 Remove</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="align-items:start;">
+  <!-- LEFT: Profile card -->
+  <div>
+    <div class="card">
+      <div class="card-body" style="text-align:center; padding:36px 22px;">
+        <div class="member-avatar" style="width:80px;height:80px;font-size:2rem;margin:0 auto 16px;">
+          {{ member.first_name[0] }}{{ member.last_name[0] }}
+        </div>
+        <h2 style="font-size:1.4rem;">{{ member.first_name }} {{ member.last_name }}</h2>
+        <div style="margin:10px 0; display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">
+          {% if member.voice_part %}
+          <span class="voice-badge voice-{{ member.voice_part }}">{{ member.voice_part }}</span>
+          {% endif %}
+          {% if member.section %}
+          <span class="badge" style="background:var(--ivory2);color:var(--slate);">{{ member.section }}</span>
+          {% endif %}
+          <span class="badge badge-{{ member.status }}">{{ member.status }}</span>
+        </div>
+        <div style="color:var(--slate);font-size:0.82rem;margin-top:8px;">
+          Member since {{ member.join_date or 'N/A' }}
+        </div>
+      </div>
+      <div style="border-top:1px solid var(--ivory2);">
+        {% for label, value in [
+          ('📧 Email', member.email),
+          ('📞 Phone', member.phone),
+          ('🏠 Address', member.address),
+          ('🎂 Date of Birth', member.date_of_birth),
+        ] %}
+        {% if value %}
+        <div style="padding:12px 22px; border-bottom:1px solid var(--ivory2); display:flex; gap:12px;">
+          <span style="color:var(--slate);font-size:0.82rem;min-width:100px;">{{ label }}</span>
+          <span style="color:var(--navy);font-size:0.9rem;">{{ value }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if member.emergency_contact_name %}
+    <div class="card mt-2">
+      <div class="card-header"><div class="card-title">🚨 Emergency Contact</div></div>
+      <div class="card-body">
+        <div class="fw-bold">{{ member.emergency_contact_name }}</div>
+        <div class="text-slate">{{ member.emergency_contact_phone }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if member.notes %}
+    <div class="card mt-2">
+      <div class="card-header"><div class="card-title">📝 Notes</div></div>
+      <div class="card-body" style="color:var(--slate);font-size:0.9rem;">{{ member.notes }}</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- RIGHT: Activity -->
+  <div>
+    <!-- Donation summary -->
+    <div class="stat-card green" style="margin-bottom:18px;">
+      <div class="stat-icon">💰</div>
+      <div>
+        <div class="stat-value">${{ "%.2f"|format(total_given) }}</div>
+        <div class="stat-label">Total Contributions</div>
+      </div>
+    </div>
+
+    <!-- Duties -->
+    <div class="card mb-2">
+      <div class="card-header">
+        <div class="card-title">📋 Recent Duties</div>
+        <a href="{{ url_for('roster') }}" class="btn btn-sm btn-outline">Roster</a>
+      </div>
+      <div class="card-body" style="padding:0;">
+        {% if duties %}
+        <table>
+          <thead><tr><th>Duty</th><th>Date</th><th>Service</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for d in duties %}
+            <tr>
+              <td class="fw-bold">{{ d.duty_type }}</td>
+              <td class="fs-sm">{{ d.scheduled_date }}</td>
+              <td class="fs-sm text-slate">{{ d.service_type }}</td>
+              <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state" style="padding:24px;">
+          <p>No duties recorded</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Donations -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">💸 Donation History</div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        {% if donations %}
+        <table>
+          <thead><tr><th>Date</th><th>Category</th><th>Method</th><th>Amount</th></tr></thead>
+          <tbody>
+            {% for d in donations %}
+            <tr>
+              <td class="fs-sm">{{ d.donation_date }}</td>
+              <td>
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ d.color or '#ccc' }};margin-right:5px;"></span>
+                {{ d.category_name or 'General' }}
+              </td>
+              <td class="fs-sm text-slate">{{ d.payment_method }}</td>
+              <td class="fw-bold text-success">${{ "%.2f"|format(d.amount) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state" style="padding:24px;">
+          <p>No donations recorded</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

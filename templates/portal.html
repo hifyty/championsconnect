@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}My Portal{% endblock %}
+{% block page_title %}My Portal{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('change_password') }}" class="btn btn-outline">🔑 Change Password</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- GREETING + VERSE -->
+<div style="background:linear-gradient(135deg,var(--navy),#243560);border-radius:var(--radius);padding:28px 32px;margin-bottom:24px;color:#fff;">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;">
+    <div>
+      <h2 style="font-size:1.5rem;margin-bottom:6px;">Welcome, {{ user.first_name }}! 🙌</h2>
+      <p style="color:rgba(255,255,255,.7);font-size:0.9rem;">{{ now.strftime('%A, %B %d, %Y') }}</p>
+      {% if daily_verse %}
+      <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,.15);">
+        <div style="color:var(--gold);font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Today's Verse</div>
+        <p style="font-style:italic;font-size:0.9rem;line-height:1.6;margin:0;">"{{ daily_verse.verse_text[:120] }}{{ '...' if daily_verse.verse_text|length > 120 else '' }}"</p>
+        <p style="color:var(--gold);font-size:0.82rem;margin-top:6px;">— {{ daily_verse.reference }}</p>
+      </div>
+      {% endif %}
+    </div>
+    <div style="text-align:center;">
+      <div style="width:70px;height:70px;background:var(--gold);border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;color:var(--navy);margin:0 auto 8px;">
+        {{ user.first_name[0] }}{{ user.last_name[0] }}
+      </div>
+      <div style="color:var(--gold);font-size:0.72rem;text-transform:uppercase;letter-spacing:1px;">{{ session.get('role','member') }}</div>
+    </div>
+  </div>
+</div>
+
+{% if member %}
+<!-- STATS -->
+<div class="stats-grid" style="margin-bottom:24px;">
+  <div class="stat-card green">
+    <div class="stat-icon">💰</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(total_given) }}</div>
+      <div class="stat-label">Total Contributions</div>
+    </div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-icon">📋</div>
+    <div>
+      <div class="stat-value">{{ upcoming_duties|length }}</div>
+      <div class="stat-label">Upcoming Duties</div>
+    </div>
+  </div>
+  {% if attendance_rate and attendance_rate.total_services > 0 %}
+  {% set att_pct = ((attendance_rate.present / attendance_rate.total_services)*100)|round|int %}
+  <div class="stat-card {% if att_pct >= 80 %}green{% elif att_pct >= 60 %}{% else %}red{% endif %}">
+    <div class="stat-icon">✅</div>
+    <div>
+      <div class="stat-value">{{ att_pct }}%</div>
+      <div class="stat-label">Attendance Rate</div>
+    </div>
+  </div>
+  {% endif %}
+  <div class="stat-card">
+    <div class="stat-icon">🎵</div>
+    <div>
+      <div class="stat-value">{{ member.voice_part or '—' }}</div>
+      <div class="stat-label">Voice Part</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2" style="align-items:start;">
+  <!-- LEFT -->
+  <div>
+    <!-- Profile card -->
+    <div class="card mb-2">
+      <div class="card-header">
+        <div class="card-title">👤 My Profile</div>
+        <a href="{{ url_for('edit_member', member_id=member.id) }}" class="btn btn-sm btn-outline">Edit</a>
+      </div>
+      <div class="card-body">
+        {% for label, value in [
+          ('📧 Email', member.email),
+          ('📞 Phone', member.phone),
+          ('🏠 Address', member.address),
+          ('🎵 Voice Part', member.voice_part),
+          ('🏅 Section', member.section),
+          ('📅 Member Since', member.join_date),
+        ] %}
+        {% if value %}
+        <div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid var(--ivory2);">
+          <span style="color:var(--slate);font-size:0.82rem;min-width:110px;">{{ label }}</span>
+          <span style="font-size:0.9rem;">{{ value }}</span>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Upcoming duties -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">📋 My Upcoming Duties</div>
+        <a href="{{ url_for('roster') }}" class="btn btn-sm btn-outline">Full Roster</a>
+      </div>
+      <div class="card-body" style="padding:0;">
+        {% if upcoming_duties %}
+        <table>
+          <thead><tr><th>Date</th><th>Duty</th><th>Service</th><th>Status</th></tr></thead>
+          <tbody>
+            {% for d in upcoming_duties %}
+            <tr>
+              <td class="fw-bold fs-sm">{{ d.scheduled_date }}</td>
+              <td>{{ d.duty_type }}</td>
+              <td class="fs-sm text-slate">{{ d.service_type }}</td>
+              <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state" style="padding:24px;">
+          <p>No upcoming duties assigned</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div>
+    <!-- Donation history -->
+    <div class="card mb-2">
+      <div class="card-header">
+        <div class="card-title">💰 My Giving History</div>
+        <a href="{{ url_for('donation_receipt', member_id=member.id) }}" class="btn btn-sm btn-outline">📄 Receipt</a>
+      </div>
+      <div class="card-body" style="padding:0;">
+        {% if donations %}
+        <table>
+          <thead><tr><th>Date</th><th>Category</th><th>Amount</th></tr></thead>
+          <tbody>
+            {% for d in donations %}
+            <tr>
+              <td class="fs-sm">{{ d.donation_date }}</td>
+              <td>
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ d.color or '#ccc' }};margin-right:5px;"></span>
+                {{ d.category_name or 'General' }}
+              </td>
+              <td class="fw-bold text-success">${{ "%.2f"|format(d.amount) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state" style="padding:24px;"><p>No donations recorded yet</p></div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Account settings -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">⚙️ Account Settings</div></div>
+      <div class="card-body">
+        <p style="color:var(--slate);font-size:0.875rem;margin-bottom:14px;">
+          Signed in as <strong>{{ user.email }}</strong>
+        </p>
+        <a href="{{ url_for('change_password') }}" class="btn btn-outline w-100" style="justify-content:center;margin-bottom:10px;">
+          🔑 Change Password
+        </a>
+        <div style="font-size:0.78rem;color:var(--slate);margin-top:8px;">
+          Mailing list: 
+          <span class="badge {% if member.on_mailing_list %}badge-active{% else %}badge-inactive{% endif %}">
+            {{ 'Subscribed ✅' if member.on_mailing_list else 'Not subscribed' }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- No member record linked yet -->
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:48px;">
+    <div style="font-size:3rem;margin-bottom:16px;">👤</div>
+    <h3 style="margin-bottom:8px;">No member profile linked yet</h3>
+    <p style="color:var(--slate);margin-bottom:20px;">
+      Your account (<strong>{{ user.email }}</strong>) isn't linked to a member record yet.<br>
+      Ask an admin to add your email to your member profile.
+    </p>
+    <a href="{{ url_for('members') }}" class="btn btn-gold">View Member Directory</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

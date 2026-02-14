@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}{{ ev.title }}{% endblock %}
+{% block page_title %}Event Detail{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('events') }}" class="btn btn-outline">← Back to Events</a>
+{% if session.get('role') in ['admin','finance'] %}
+<form method="POST" action="{{ url_for('delete_event', event_id=ev.id) }}"
+      onsubmit="return confirm('Delete this event?');" style="display:inline;">
+  <button type="submit" class="btn btn-danger">Delete Event</button>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div style="max-width:720px;">
+
+  <!-- Flyer / GIF display -->
+  {% if ev.flyer_filename %}
+  {% set ext = ev.flyer_filename.rsplit('.',1)[1].lower() if '.' in ev.flyer_filename else '' %}
+  {% if ext in ['jpg','jpeg','png','gif','webp'] %}
+  <div class="card mb-2" style="overflow:hidden;">
+    <img src="{{ url_for('static', filename='uploads/events/' + ev.flyer_filename) }}"
+         alt="{{ ev.title }} flyer"
+         style="width:100%;display:block;max-height:500px;object-fit:contain;background:#000;">
+    <div style="padding:10px 16px;background:var(--ivory2);display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:0.8rem;color:var(--slate);">
+        {% if ext == 'gif' %}🎬 Animated GIF flyer{% else %}🖼️ Event flyer{% endif %}
+      </span>
+      <a href="{{ url_for('static', filename='uploads/events/' + ev.flyer_filename) }}"
+         download class="btn btn-sm btn-outline">⬇ Download</a>
+    </div>
+  </div>
+  {% elif ext == 'pdf' %}
+  <div class="card mb-2">
+    <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+      <div style="font-size:3rem;">📄</div>
+      <div>
+        <div class="fw-bold">Program PDF attached</div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <a href="{{ url_for('static', filename='uploads/events/' + ev.flyer_filename) }}"
+             target="_blank" class="btn btn-sm btn-primary">View PDF</a>
+          <a href="{{ url_for('static', filename='uploads/events/' + ev.flyer_filename) }}"
+             download class="btn btn-sm btn-outline">⬇ Download</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  <!-- Event details -->
+  <div class="card">
+    <div style="background:var(--navy);padding:24px 28px;border-radius:var(--radius) var(--radius) 0 0;">
+      <div style="color:var(--gold);font-size:0.7rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:8px;">
+        {{ ev.event_type or 'Event' }}
+      </div>
+      <h2 style="color:#fff;font-family:'Playfair Display',serif;font-size:1.4rem;margin:0;">{{ ev.title }}</h2>
+    </div>
+    <div class="card-body">
+      <div style="display:flex;flex-direction:column;gap:14px;font-size:0.925rem;">
+        <div style="display:flex;gap:14px;align-items:center;">
+          <span style="font-size:1.2rem;">📅</span>
+          <div>
+            <div class="fw-bold">{{ ev.event_date }}</div>
+            {% if ev.start_time %}
+            <div class="fs-sm text-slate">{{ ev.start_time }}{% if ev.end_time %} – {{ ev.end_time }}{% endif %}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% if ev.location %}
+        <div style="display:flex;gap:14px;align-items:center;">
+          <span style="font-size:1.2rem;">📍</span>
+          <div class="fw-bold">{{ ev.location }}</div>
+        </div>
+        {% endif %}
+        {% if ev.description %}
+        <div style="display:flex;gap:14px;align-items:flex-start;">
+          <span style="font-size:1.2rem;">📝</span>
+          <div style="color:var(--slate);line-height:1.7;">{{ ev.description }}</div>
+        </div>
+        {% endif %}
+        <div style="display:flex;gap:14px;align-items:center;">
+          <span style="font-size:1.2rem;">🏷️</span>
+          <span class="badge badge-{{ ev.status }}">{{ ev.status }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+{% block title %}{{ post.title }}{% endblock %}
+{% block page_title %}News & Blog{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('news') }}" class="btn btn-outline">← Back to News</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:720px;">
+
+  <!-- POST -->
+  <div class="card mb-2">
+    <div class="card-body" style="padding:28px 32px;">
+      <!-- Category + date -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+        <span class="badge" style="background:var(--ivory2);color:var(--navy);text-transform:uppercase;letter-spacing:1px;font-size:0.7rem;">
+          {{ post.category or 'Announcement' }}
+        </span>
+        {% if post.pinned %}
+        <span class="badge badge-active">📌 Pinned</span>
+        {% endif %}
+        <span class="fs-sm text-slate">{{ post.created_at[:10] if post.created_at else '' }}</span>
+        {% if post.first_name %}
+        <span class="fs-sm text-slate">by {{ post.first_name }} {{ post.last_name }}</span>
+        {% endif %}
+      </div>
+
+      <!-- Title -->
+      <h1 style="font-family:'Playfair Display',serif;font-size:1.6rem;color:var(--navy);line-height:1.3;margin-bottom:16px;">
+        {{ post.title }}
+      </h1>
+
+      <!-- Body -->
+      <div style="font-size:0.95rem;line-height:1.9;color:#334155;">
+        {{ post.body | replace('\n','<br>') | safe }}
+      </div>
+    </div>
+
+    <!-- LIKE / SHARE BAR -->
+    <div style="padding:14px 32px;border-top:1px solid var(--ivory2);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+      <!-- Like button -->
+      <div style="display:flex;align-items:center;gap:12px;">
+        <button id="likeBtn" onclick="toggleLike({{ post.id }})"
+          style="display:flex;align-items:center;gap:6px;padding:7px 14px;border-radius:20px;border:1.5px solid {% if user_liked %}#ec4899{% else %}var(--ivory2){% endif %};background:{% if user_liked %}#fdf2f8{% else %}#fff{% endif %};cursor:pointer;font-size:0.875rem;color:{% if user_liked %}#ec4899{% else %}var(--slate){% endif %};">
+          <span id="likeHeart">{% if user_liked %}❤️{% else %}🤍{% endif %}</span>
+          <span id="likeCount">{{ like_count }}</span>
+          <span>Like{{ 's' if like_count != 1 }}</span>
+        </button>
+        <span class="fs-sm text-slate">{{ comments|length }} comment{{ 's' if comments|length != 1 }}</span>
+      </div>
+
+      <!-- Share buttons -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span class="fs-sm text-slate">Share:</span>
+        <button onclick="copyLink()" class="btn btn-sm btn-outline" title="Copy link">🔗 Copy Link</button>
+        <a href="https://www.facebook.com/sharer/sharer.php?u={{ request.url | urlencode }}"
+           target="_blank" class="btn btn-sm btn-outline" style="background:#1877f2;color:#fff;border-color:#1877f2;">
+          Facebook
+        </a>
+        <a href="https://wa.me/?text={{ (post.title + ' ' + request.url) | urlencode }}"
+           target="_blank" class="btn btn-sm btn-outline" style="background:#25d366;color:#fff;border-color:#25d366;">
+          WhatsApp
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMMENTS -->
+  {% if post.allow_comments %}
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">💬 Comments ({{ comments|length }})</div>
+    </div>
+    <div class="card-body">
+
+      <!-- Add comment -->
+      <form method="POST" action="{{ url_for('add_comment', post_id=post.id) }}" style="margin-bottom:20px;">
+        <div style="display:flex;gap:10px;align-items:flex-start;">
+          <div style="width:36px;height:36px;background:var(--navy);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--gold);font-weight:700;font-size:0.85rem;flex-shrink:0;">
+            {{ session.get('name','?')[0] }}
+          </div>
+          <div style="flex:1;">
+            <textarea name="comment_text" rows="2" required
+              placeholder="Share your thoughts..."
+              style="width:100%;padding:10px 14px;border:1.5px solid var(--ivory2);border-radius:8px;font-size:0.875rem;resize:vertical;font-family:inherit;"></textarea>
+            <button type="submit" class="btn btn-gold btn-sm" style="margin-top:8px;">Post Comment</button>
+          </div>
+        </div>
+      </form>
+
+      <!-- Comment list -->
+      {% if comments %}
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        {% for c in comments %}
+        <div style="display:flex;gap:12px;align-items:flex-start;">
+          <div style="width:36px;height:36px;background:var(--ivory2);border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--navy);font-weight:700;font-size:0.82rem;flex-shrink:0;">
+            {{ c.first_name[0] }}
+          </div>
+          <div style="flex:1;background:var(--ivory2);border-radius:0 8px 8px 8px;padding:10px 14px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+              <span class="fw-bold fs-sm">{{ c.first_name }} {{ c.last_name }}</span>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="fs-sm text-slate">{{ c.created_at[:10] if c.created_at else '' }}</span>
+                {% if c.user_id == session.get('user_id') or session.get('role') in ['super_admin','admin','content_admin'] %}
+                <form method="POST" action="{{ url_for('delete_comment', post_id=post.id, comment_id=c.id) }}"
+                      onsubmit="return confirm('Delete this comment?');">
+                  <button type="submit" class="btn btn-xs btn-danger">✕</button>
+                </form>
+                {% endif %}
+              </div>
+            </div>
+            <div style="font-size:0.875rem;color:#334155;line-height:1.6;">{{ c.comment_text }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:20px;color:var(--slate);font-size:0.875rem;">
+        No comments yet. Be the first to share your thoughts! 🙏
+      </div>
+      {% endif %}
+
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function toggleLike(postId) {
+  const btn = document.getElementById('likeBtn');
+  const heart = document.getElementById('likeHeart');
+  const count = document.getElementById('likeCount');
+  try {
+    const resp = await fetch(`/news/${postId}/like`, {method:'POST',headers:{'X-Requested-With':'XMLHttpRequest'}});
+    const data = await resp.json();
+    heart.textContent = data.liked ? '❤️' : '🤍';
+    count.textContent = data.count;
+    btn.style.borderColor  = data.liked ? '#ec4899' : 'var(--ivory2)';
+    btn.style.background   = data.liked ? '#fdf2f8' : '#fff';
+    btn.style.color        = data.liked ? '#ec4899' : 'var(--slate)';
+  } catch(e) { console.error(e); }
+}
+
+function copyLink() {
+  navigator.clipboard.writeText(window.location.href).then(() => {
+    const btn = event.target;
+    const orig = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    setTimeout(() => btn.textContent = orig, 2000);
+  });
+}
+</script>
+{% endblock %}

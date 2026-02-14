@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}Mass Email{% endblock %}
+{% block page_title %}Mass Email{% endblock %}
+
+{% block content %}
+
+<!-- STATS ROW -->
+<div class="stats-grid" style="margin-bottom:24px;">
+  <div class="stat-card blue">
+    <div class="stat-icon">📧</div>
+    <div>
+      <div class="stat-value">{{ mailing_list|length }}</div>
+      <div class="stat-label">Active Members on List</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">👥</div>
+    <div>
+      <div class="stat-value">{{ all_with_email }}</div>
+      <div class="stat-label">Total Members with Email</div>
+    </div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon">✅</div>
+    <div>
+      <div class="stat-value">{{ blast_history|length }}</div>
+      <div class="stat-label">Emails Sent (All Time)</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2" style="align-items:start;">
+
+  <!-- COMPOSE EMAIL -->
+  <div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">✉️ Compose Mass Email</div>
+      </div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('send_blast') }}">
+          <div class="form-group">
+            <label>Send To</label>
+            <select name="target" style="padding:10px 14px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.9rem;width:100%;">
+              <option value="active">Active members on mailing list ({{ mailing_list|length }})</option>
+              <option value="all">All members with email ({{ all_with_email }})</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Subject *</label>
+            <input type="text" name="subject" placeholder="e.g. Important Announcement from Champions Connect" required>
+          </div>
+          <div class="form-group">
+            <label>Message *</label>
+            <textarea name="body" rows="8" placeholder="Type your message here...&#10;&#10;The email will be sent with the Champions Connect branding automatically." required></textarea>
+          </div>
+          <div style="background:var(--ivory2);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--slate);margin-bottom:16px;">
+            💡 Each email will be personalized and sent with Champions Connect branding. Configure SMTP below to enable real sending.
+          </div>
+          <button type="submit" class="btn btn-gold w-100" style="padding:13px;font-size:1rem;"
+            onclick="return confirm('Send email to all selected recipients?')">
+            📤 Send Email Blast
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- SMTP SETTINGS -->
+    <div class="card mt-2">
+      <div class="card-header">
+        <div class="card-title">⚙️ Email Settings (SMTP)</div>
+        <button class="btn btn-sm btn-outline" onclick="document.getElementById('smtpForm').style.display=document.getElementById('smtpForm').style.display=='none'?'block':'none'">
+          Configure
+        </button>
+      </div>
+      <div class="card-body">
+        {% if settings and settings.smtp_user %}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span class="badge badge-active">✅ Configured</span>
+          <span style="color:var(--slate);font-size:0.85rem;">Sending as: {{ settings.smtp_user }}</span>
+        </div>
+        {% else %}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <span class="badge badge-inactive">⚠️ Not Configured</span>
+          <span style="color:var(--slate);font-size:0.85rem;">Emails will be logged but not sent</span>
+        </div>
+        {% endif %}
+
+        <div id="smtpForm" style="display:none;margin-top:14px;">
+          <form method="POST" action="{{ url_for('save_email_settings') }}">
+            <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;font-size:0.8rem;color:#92400e;margin-bottom:14px;">
+              🔐 <strong>Gmail users:</strong> Use an <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#92400e;">App Password</a>, not your regular password. Enable 2FA first.
+            </div>
+            <div class="form-group">
+              <label>Sender Name</label>
+              <input type="text" name="sender_name" value="{{ settings.sender_name if settings else 'Champions Connect' }}">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>SMTP Host</label>
+                <input type="text" name="smtp_host" value="{{ settings.smtp_host if settings else 'smtp.gmail.com' }}">
+              </div>
+              <div class="form-group">
+                <label>Port</label>
+                <input type="number" name="smtp_port" value="{{ settings.smtp_port if settings else 587 }}">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Email (Gmail address)</label>
+              <input type="email" name="smtp_user" value="{{ settings.smtp_user if settings else '' }}" placeholder="yourchurch@gmail.com">
+            </div>
+            <div class="form-group">
+              <label>App Password</label>
+              <input type="password" name="smtp_password" placeholder="16-character app password">
+            </div>
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT COLUMN -->
+  <div>
+    <!-- MAILING LIST -->
+    <div class="card mb-2">
+      <div class="card-header">
+        <div class="card-title">📋 Mailing List</div>
+        <span class="fs-sm text-slate">{{ mailing_list|length }} active</span>
+      </div>
+      <div style="max-height:300px;overflow-y:auto;">
+        <table>
+          <thead><tr><th>Member</th><th>Email</th><th>On List</th></tr></thead>
+          <tbody>
+            {% for m in mailing_list %}
+            <tr>
+              <td>
+                <strong>{{ m.first_name }} {{ m.last_name }}</strong>
+                <div class="fs-sm text-slate">{{ m.voice_part or '' }}</div>
+              </td>
+              <td class="fs-sm">{{ m.email }}</td>
+              <td>
+                <form method="POST" action="{{ url_for('toggle_mailing_list', member_id=m.id) }}">
+                  <button type="submit" class="btn btn-xs {% if m.on_mailing_list %}btn-success{% else %}btn-outline{% endif %}"
+                    title="Click to toggle">
+                    {{ '✅' if m.on_mailing_list else '○' }}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BLAST HISTORY -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🕐 Email History</div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        {% if blast_history %}
+        {% for b in blast_history %}
+        <div style="padding:14px 18px;border-bottom:1px solid var(--ivory2);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+            <div style="flex:1;">
+              <div class="fw-bold" style="font-size:0.9rem;">{{ b.subject }}</div>
+              <div class="fs-sm text-slate">
+                {{ b.sent_at[:16] if b.sent_at else '—' }} ·
+                {{ b.recipient_count }} recipients ·
+                {{ b.first_name or 'System' }} {{ b.last_name or '' }}
+              </div>
+              {% if b.error_msg and b.status == 'simulated' %}
+              <div style="font-size:0.75rem;color:var(--warning);margin-top:4px;">⚠️ Simulated (SMTP not set)</div>
+              {% endif %}
+            </div>
+            <span class="badge {% if b.status == 'sent' %}badge-active{% elif b.status == 'simulated' %}badge-scheduled{% else %}badge-inactive{% endif %}">
+              {{ b.status }}
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state" style="padding:28px;">
+          <div class="icon" style="font-size:2rem;">📧</div>
+          <p>No emails sent yet</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>{{ qa_s.title }} · Q&A</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:Georgia,serif; background:#0f172a; color:#fff; min-height:100vh; }
+    .header { background:#1a2744; padding:14px 20px; border-bottom:2px solid #c9a84c; display:flex; align-items:center; justify-content:space-between; }
+    .header-title { color:#c9a84c; font-weight:700; font-size:0.95rem; }
+    .header-code { font-family:monospace; font-size:0.9rem; background:rgba(201,168,76,.15); color:#c9a84c; padding:3px 9px; border-radius:5px; letter-spacing:2px; }
+    .closed-pill { background:#7f1d1d; color:#fca5a5; font-size:0.75rem; padding:3px 10px; border-radius:12px; }
+    .live-pill { background:#14532d; color:#86efac; font-size:0.75rem; padding:3px 10px; border-radius:12px; animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+    .container { padding:16px; max-width:540px; margin:0 auto; }
+
+    .session-info { background:#1e293b; border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+    .session-info h2 { font-size:1rem; color:#fff; margin-bottom:3px; }
+    .session-info p { font-size:0.82rem; color:#94a3b8; }
+
+    /* Submit form */
+    .submit-card { background:#1e293b; border-radius:10px; padding:16px; margin-bottom:16px; }
+    .submit-card h3 { color:#c9a84c; font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+    textarea { width:100%; background:#0f172a; border:1.5px solid #334155; border-radius:8px; color:#fff; padding:10px 12px; font-size:0.9rem; font-family:Georgia,serif; resize:vertical; min-height:80px; outline:none; }
+    textarea:focus { border-color:#c9a84c; }
+    .name-row { display:flex; gap:8px; align-items:center; margin-top:8px; }
+    .name-input { flex:1; background:#0f172a; border:1.5px solid #334155; border-radius:7px; color:#94a3b8; padding:7px 10px; font-size:0.82rem; outline:none; font-family:Georgia,serif; }
+    .anon-label { font-size:0.75rem; color:#64748b; white-space:nowrap; }
+    .char-count { text-align:right; font-size:0.72rem; color:#64748b; margin-top:3px; }
+    .submit-btn { width:100%; background:#c9a84c; color:#1a2744; border:none; border-radius:8px; padding:11px; font-size:0.95rem; font-weight:700; cursor:pointer; margin-top:10px; font-family:Georgia,serif; }
+    .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+    /* Success toast */
+    .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#1a2744; border:1px solid #c9a84c; color:#c9a84c; padding:10px 20px; border-radius:8px; font-size:0.875rem; z-index:999; display:none; }
+
+    /* Questions feed */
+    .feed-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .feed-header h3 { color:#94a3b8; font-size:0.8rem; text-transform:uppercase; letter-spacing:1px; }
+    .live-dot { width:7px; height:7px; background:#22c55e; border-radius:50%; display:inline-block; animation:pulse 1.5s infinite; margin-right:4px; }
+    .q-item { background:#1e293b; border-radius:10px; padding:12px 14px; margin-bottom:10px; display:flex; gap:10px; align-items:flex-start; border:1px solid #334155; transition:all .3s; }
+    .q-item.featured { border-color:#c9a84c; box-shadow:0 0 0 1px rgba(201,168,76,.3); }
+    .q-item.answered { opacity:0.45; }
+    .vote-col { display:flex; flex-direction:column; align-items:center; gap:2px; }
+    .vote-btn { background:#0f172a; border:1.5px solid #334155; color:#94a3b8; border-radius:7px; padding:6px 10px; cursor:pointer; font-size:0.9rem; min-width:38px; text-align:center; transition:all .15s; }
+    .vote-btn.voted { border-color:#c9a84c; color:#c9a84c; background:rgba(201,168,76,.08); }
+    .vote-count { font-size:0.75rem; color:#94a3b8; font-weight:700; }
+    .q-body { flex:1; }
+    .q-featured-tag { font-size:0.67rem; background:#c9a84c; color:#1a2744; padding:2px 7px; border-radius:10px; font-weight:700; display:inline-block; margin-bottom:5px; }
+    .q-answered-tag { font-size:0.67rem; background:#22c55e; color:#fff; padding:2px 7px; border-radius:10px; display:inline-block; margin-bottom:5px; }
+    .q-text { font-size:0.9rem; line-height:1.6; color:#e2e8f0; }
+    .q-meta { font-size:0.7rem; color:#475569; margin-top:4px; }
+    .empty-feed { text-align:center; padding:28px; color:#475569; font-size:0.875rem; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title">{{ qa_s.title }}</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;">
+    <span class="header-code">{{ qa_s.join_code }}</span>
+    {% if qa_s.status == 'active' %}
+    <span class="live-pill">🟢 Live</span>
+    {% else %}
+    <span class="closed-pill">Closed</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="container">
+
+  {% if qa_s.description %}
+  <div class="session-info">
+    <p>{{ qa_s.description }}</p>
+  </div>
+  {% endif %}
+
+  {% if qa_s.status == 'active' %}
+  <!-- SUBMIT FORM -->
+  <div class="submit-card">
+    <h3>Ask a Question</h3>
+    <textarea id="questionText" maxlength="300" placeholder="Type your question here..."
+              oninput="updateChar()"></textarea>
+    <div class="char-count"><span id="charLeft">300</span> characters remaining</div>
+    <div class="name-row">
+      <input class="name-input" id="senderName" type="text" placeholder="Your name (optional)" maxlength="50">
+      <span class="anon-label">Leave blank for anonymous</span>
+    </div>
+    <button class="submit-btn" id="submitBtn" onclick="submitQuestion()">Submit Question →</button>
+  </div>
+  {% else %}
+  <div style="background:#7f1d1d;border-radius:10px;padding:14px 16px;margin-bottom:16px;text-align:center;">
+    <div style="font-size:1.5rem;margin-bottom:4px;">⏹</div>
+    <div style="color:#fca5a5;font-weight:700;">This session is closed</div>
+    <div style="color:#f87171;font-size:0.82rem;margin-top:4px;">No new questions can be submitted</div>
+  </div>
+  {% endif %}
+
+  <!-- QUESTIONS FEED -->
+  {% if not qa_s.moderation %}
+  <div>
+    <div class="feed-header">
+      <h3><span class="live-dot"></span> Questions</h3>
+      <span id="qCount" style="font-size:0.75rem;color:#475569;">Loading...</span>
+    </div>
+    <div id="questionsFeed">
+      {% for q in questions %}
+      <div class="q-item {% if q.is_featured %}featured{% endif %} {% if q.is_answered %}answered{% endif %}" id="qi-{{ q.id }}">
+        <div class="vote-col">
+          <button class="vote-btn" id="vb-{{ q.id }}" onclick="toggleVote({{ q.id }})">▲</button>
+          <div class="vote-count" id="vc-{{ q.id }}">{{ q.vote_count }}</div>
+        </div>
+        <div class="q-body">
+          {% if q.is_featured %}<div class="q-featured-tag">⭐ Featured</div>{% endif %}
+          {% if q.is_answered %}<div class="q-answered-tag">✅ Answered</div>{% endif %}
+          <div class="q-text">{{ q.question_text }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:20px;color:#475569;font-size:0.82rem;background:#1e293b;border-radius:10px;">
+    🛡️ This session is moderated. Your question will appear after approval.
+  </div>
+  {% endif %}
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const JOIN_CODE = '{{ qa_s.join_code }}';
+const IS_ACTIVE = {{ 'true' if qa_s.status == 'active' else 'false' }};
+const MODERATED = {{ 'true' if qa_s.moderation else 'false' }};
+
+// Track voted questions via localStorage
+const votedKey = 'qa_voted_' + JOIN_CODE;
+let voted = JSON.parse(localStorage.getItem(votedKey) || '{}');
+
+function updateChar() {
+  const left = 300 - document.getElementById('questionText').value.length;
+  document.getElementById('charLeft').textContent = left;
+  document.getElementById('submitBtn').disabled = left < 0 || left === 300;
+}
+
+async function submitQuestion() {
+  const text = document.getElementById('questionText').value.trim();
+  const name = document.getElementById('senderName').value.trim();
+  if (!text) return;
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting...';
+  try {
+    const fd = new FormData();
+    fd.append('question', text);
+    fd.append('name', name);
+    const resp = await fetch(`/qa/${JOIN_CODE}/submit`, {method:'POST', body:fd});
+    const data = await resp.json();
+    if (data.ok) {
+      document.getElementById('questionText').value = '';
+      document.getElementById('senderName').value  = '';
+      updateChar();
+      showToast(data.moderated ? '⏳ Question submitted — awaiting approval' : '✅ Question submitted!');
+      if (!MODERATED) loadQuestions();
+    } else {
+      showToast('⚠️ ' + (data.error || 'Error submitting'));
+    }
+  } catch(e) {
+    showToast('⚠️ Connection error');
+  }
+  btn.disabled = false; btn.textContent = 'Submit Question →';
+}
+
+async function toggleVote(qId) {
+  const btn = document.getElementById('vb-' + qId);
+  const resp = await fetch(`/qa/${JOIN_CODE}/vote`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question_id: qId})
+  });
+  const data = await resp.json();
+  if (!data.error) {
+    document.getElementById('vc-' + qId).textContent = data.count;
+    if (data.voted) {
+      btn.classList.add('voted');
+      voted[qId] = true;
+    } else {
+      btn.classList.remove('voted');
+      delete voted[qId];
+    }
+    localStorage.setItem(votedKey, JSON.stringify(voted));
+  }
+}
+
+async function loadQuestions() {
+  if (MODERATED) return;
+  try {
+    const resp = await fetch(`/qa/${JOIN_CODE}/questions`);
+    const qs   = await resp.json();
+    const feed = document.getElementById('questionsFeed');
+    document.getElementById('qCount').textContent = qs.length + ' question' + (qs.length !== 1 ? 's' : '');
+    let html = '';
+    if (qs.length === 0) {
+      html = '<div class="empty-feed">No questions yet — be the first! 🙏</div>';
+    } else {
+      qs.forEach(q => {
+        const isVoted = voted[q.id];
+        html += `<div class="q-item ${q.is_featured?'featured':''} ${q.is_answered?'answered':''}" id="qi-${q.id}">
+          <div class="vote-col">
+            <button class="vote-btn ${isVoted?'voted':''}" id="vb-${q.id}" onclick="toggleVote(${q.id})">▲</button>
+            <div class="vote-count" id="vc-${q.id}">${q.vote_count}</div>
+          </div>
+          <div class="q-body">
+            ${q.is_featured?'<div class="q-featured-tag">⭐ Featured</div>':''}
+            ${q.is_answered?'<div class="q-answered-tag">✅ Answered</div>':''}
+            <div class="q-text">${q.question_text}</div>
+          </div>
+        </div>`;
+      });
+    }
+    feed.innerHTML = html;
+  } catch(e) {}
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 3000);
+}
+
+// Initial load + auto-refresh every 4 seconds
+loadQuestions();
+if (IS_ACTIVE && !MODERATED) setInterval(loadQuestions, 4000);
+
+// Disable submit initially
+if (document.getElementById('submitBtn')) {
+  document.getElementById('submitBtn').disabled = true;
+}
+</script>
+</body>
+</html>

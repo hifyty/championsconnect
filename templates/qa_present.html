@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ qa_s.title }} · Presenter View</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;600;700&display=swap');
+    * { box-sizing:border-box; margin:0; padding:0; }
+
+    body {
+      font-family:'Inter',sans-serif;
+      background:#0f172a;
+      color:#fff;
+      height:100vh;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      background:linear-gradient(90deg,#1a2744,#0f172a);
+      padding:14px 32px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      border-bottom:2px solid #c9a84c;
+      flex-shrink:0;
+    }
+    .brand { display:flex; align-items:center; gap:14px; }
+    .brand-cross { font-size:1.8rem; }
+    .brand-name { font-family:'Playfair Display',serif; font-size:1.1rem; color:#c9a84c; line-height:1.1; }
+    .brand-sub { font-size:0.72rem; color:rgba(255,255,255,.4); letter-spacing:1.5px; text-transform:uppercase; }
+    .session-title { font-family:'Playfair Display',serif; font-size:1.15rem; color:#fff; text-align:center; }
+    .session-desc { font-size:0.75rem; color:rgba(255,255,255,.5); text-align:center; margin-top:2px; }
+    .topbar-right { display:flex; align-items:center; gap:16px; }
+    .join-box { background:rgba(201,168,76,.12); border:1px solid rgba(201,168,76,.4); border-radius:8px; padding:6px 14px; text-align:center; }
+    .join-label { font-size:0.62rem; color:#c9a84c; text-transform:uppercase; letter-spacing:1.5px; }
+    .join-code { font-family:'Inter',monospace; font-size:1.3rem; font-weight:700; color:#c9a84c; letter-spacing:4px; line-height:1.2; }
+    .join-url { font-size:0.65rem; color:rgba(255,255,255,.4); margin-top:1px; }
+    .live-badge { display:flex; align-items:center; gap:6px; font-size:0.75rem; font-weight:600; color:#86efac; }
+    .live-dot { width:8px; height:8px; background:#22c55e; border-radius:50%; animation:livepulse 1.5s infinite; }
+    @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.3)} }
+    .q-counter { font-size:0.75rem; color:rgba(255,255,255,.4); }
+
+    /* ── MAIN STAGE ── */
+    .stage {
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      overflow:hidden;
+      padding:20px 32px 16px;
+      gap:16px;
+    }
+
+    /* Featured question — hero display */
+    .featured-zone {
+      flex-shrink:0;
+      min-height: 0;
+    }
+    .featured-card {
+      background:linear-gradient(135deg,#1a2744,#1e3a5f);
+      border:2px solid #c9a84c;
+      border-radius:14px;
+      padding:24px 32px;
+      position:relative;
+      display:none;
+      box-shadow:0 0 40px rgba(201,168,76,.2);
+    }
+    .featured-card.visible { display:block; }
+    .featured-label {
+      position:absolute; top:14px; right:18px;
+      background:#c9a84c; color:#1a2744;
+      font-size:0.7rem; font-weight:700; text-transform:uppercase;
+      letter-spacing:1px; padding:3px 10px; border-radius:10px;
+    }
+    .featured-q {
+      font-family:'Playfair Display',serif;
+      font-size:clamp(1.2rem,2.5vw,1.8rem);
+      line-height:1.5;
+      color:#fff;
+    }
+    .featured-votes {
+      margin-top:12px;
+      display:flex; align-items:center; gap:8px;
+      color:#c9a84c; font-size:0.85rem; font-weight:600;
+    }
+
+    /* Scrolling question list */
+    .queue-zone {
+      flex:1;
+      overflow:hidden;
+      display:flex;
+      flex-direction:column;
+    }
+    .queue-label {
+      font-size:0.7rem; color:rgba(255,255,255,.35); text-transform:uppercase; letter-spacing:1.5px;
+      margin-bottom:8px; flex-shrink:0;
+    }
+    .queue-list {
+      flex:1;
+      overflow-y:auto;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      padding-right:4px;
+      scrollbar-width:thin;
+      scrollbar-color:#334155 transparent;
+    }
+    .q-card {
+      background:#1e293b;
+      border-radius:10px;
+      padding:14px 18px;
+      display:flex;
+      align-items:center;
+      gap:16px;
+      border:1px solid #2d3f5e;
+      transition:all .4s;
+      animation:slideIn .4s ease;
+    }
+    @keyframes slideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+    .q-card.answered { opacity:0.3; }
+    .q-card.new-highlight { border-color:rgba(201,168,76,.5); background:#1a2744; }
+    .vote-chip {
+      background:#0f172a; border:1.5px solid #334155; border-radius:8px;
+      padding:6px 12px; text-align:center; min-width:52px; flex-shrink:0;
+    }
+    .vote-num { font-size:1.1rem; font-weight:700; color:#c9a84c; line-height:1; }
+    .vote-lbl { font-size:0.6rem; color:#475569; text-transform:uppercase; }
+    .q-card-text { flex:1; font-size:clamp(0.85rem,1.3vw,1rem); line-height:1.5; color:#cbd5e1; }
+    .q-answered-chip {
+      font-size:0.65rem; background:#14532d; color:#86efac;
+      padding:2px 8px; border-radius:10px; flex-shrink:0;
+    }
+
+    /* Empty state */
+    .empty-stage {
+      flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px;
+    }
+    .empty-stage .icon { font-size:3rem; opacity:.3; }
+    .empty-stage p { color:rgba(255,255,255,.3); font-size:0.95rem; }
+    .empty-code {
+      font-family:monospace; font-size:1.4rem; color:#c9a84c; letter-spacing:4px;
+      background:rgba(201,168,76,.1); padding:8px 20px; border-radius:8px;
+    }
+
+    /* Footer */
+    .footer {
+      flex-shrink:0;
+      background:#0a0f1e;
+      padding:8px 32px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      border-top:1px solid #1e293b;
+    }
+    .footer-left { font-size:0.7rem; color:rgba(255,255,255,.25); }
+    .footer-mid { font-size:0.7rem; color:rgba(255,255,255,.2); text-align:center; }
+    .footer-right { font-size:0.7rem; color:rgba(255,255,255,.2); }
+  </style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-cross">✝️</div>
+    <div>
+      <div class="brand-name">Champions Connect</div>
+      <div class="brand-sub">Live Q&A</div>
+    </div>
+  </div>
+  <div>
+    <div class="session-title">{{ qa_s.title }}</div>
+    {% if qa_s.description %}
+    <div class="session-desc">{{ qa_s.description }}</div>
+    {% endif %}
+  </div>
+  <div class="topbar-right">
+    <div>
+      <div class="live-badge"><span class="live-dot"></span> Live</div>
+      <div class="q-counter" id="qCounter">0 questions</div>
+    </div>
+    <div class="join-box">
+      <div class="join-label">Join at</div>
+      <div class="join-code">{{ qa_s.join_code }}</div>
+      <div class="join-url">{{ request.host }}/qa/{{ qa_s.join_code }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- STAGE -->
+<div class="stage">
+  <!-- Featured question hero -->
+  <div class="featured-zone">
+    <div class="featured-card" id="featuredCard">
+      <div class="featured-label">⭐ Featured Question</div>
+      <div class="featured-q" id="featuredText"></div>
+      <div class="featured-votes">
+        <span>▲</span>
+        <span id="featuredVotes">0</span>
+        <span style="color:rgba(255,255,255,.4);font-weight:400;">upvotes</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Question queue -->
+  <div class="queue-zone" id="queueZone">
+    <div class="queue-label" id="queueLabel">Waiting for questions...</div>
+    <div class="queue-list" id="queueList">
+      <div class="empty-stage">
+        <div class="icon">💬</div>
+        <p>Questions will appear here as your audience submits them</p>
+        <div class="empty-code">{{ qa_s.join_code }}</div>
+        <p style="font-size:0.82rem;opacity:.6;">Share this code with your audience</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="footer-left">Champions Connect · champions.church</div>
+  <div class="footer-mid" id="lastUpdate">Connecting...</div>
+  <div class="footer-right" id="footerTime"></div>
+</div>
+
+<script>
+const CODE = '{{ qa_s.join_code }}';
+let knownIds = new Set();
+let pollInterval;
+
+async function loadQuestions() {
+  try {
+    const resp = await fetch(`/qa/${CODE}/questions`);
+    const qs   = await resp.json();
+
+    // Update counter
+    document.getElementById('qCounter').textContent = qs.length + ' question' + (qs.length !== 1 ? 's' : '');
+
+    // Handle featured question
+    const featured = qs.find(q => q.is_featured);
+    const fc = document.getElementById('featuredCard');
+    if (featured) {
+      document.getElementById('featuredText').textContent  = featured.question_text;
+      document.getElementById('featuredVotes').textContent = featured.vote_count;
+      fc.classList.add('visible');
+    } else {
+      fc.classList.remove('visible');
+    }
+
+    // Build queue (non-featured, non-answered first, then answered)
+    const nonFeatured = qs.filter(q => !q.is_featured);
+    const label = document.getElementById('queueLabel');
+
+    if (nonFeatured.length === 0 && !featured) {
+      document.getElementById('queueList').innerHTML = `
+        <div class="empty-stage">
+          <div class="icon">💬</div>
+          <p>Questions will appear here as your audience submits them</p>
+          <div class="empty-code">${CODE}</div>
+          <p style="font-size:.82rem;opacity:.6;">Share this code with your audience</p>
+        </div>`;
+      label.textContent = 'Waiting for questions...';
+      return;
+    }
+
+    label.textContent = nonFeatured.length + ' question' + (nonFeatured.length !== 1 ? 's' : '') + ' in queue · sorted by votes';
+
+    let html = '';
+    nonFeatured.forEach(q => {
+      const isNew = !knownIds.has(q.id);
+      if (isNew) knownIds.add(q.id);
+      html += `
+        <div class="q-card ${q.is_answered ? 'answered' : ''} ${isNew && knownIds.size > 0 ? 'new-highlight' : ''}" id="qc-${q.id}">
+          <div class="vote-chip">
+            <div class="vote-num">${q.vote_count}</div>
+            <div class="vote-lbl">votes</div>
+          </div>
+          <div class="q-card-text">${escHtml(q.question_text)}</div>
+          ${q.is_answered ? '<div class="q-answered-chip">✅ Answered</div>' : ''}
+        </div>`;
+    });
+    document.getElementById('queueList').innerHTML = html;
+
+    document.getElementById('lastUpdate').textContent = 'Last updated ' + new Date().toLocaleTimeString();
+  } catch(e) {
+    document.getElementById('lastUpdate').textContent = '⚠️ Connection issue — retrying...';
+  }
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function updateClock() {
+  document.getElementById('footerTime').textContent = new Date().toLocaleTimeString();
+}
+
+// Initial load then poll every 3 seconds
+loadQuestions();
+setInterval(loadQuestions, 3000);
+setInterval(updateClock, 1000);
+updateClock();
+</script>
+</body>
+</html>

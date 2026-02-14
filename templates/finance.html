@@ -1,0 +1,447 @@
+{% extends 'base.html' %}
+{% block title %}Finance & Donations{% endblock %}
+{% block page_title %}{% if fin_admin %}Finance & Donation Tracking{% else %}My Giving{% endif %}{% endblock %}
+
+{% block topbar_actions %}
+{% if fin_admin %}
+<button class="btn btn-gold" onclick="openModal('addDonationModal')">+ Record Donation</button>
+<button class="btn btn-outline" onclick="openModal('addExpenseModal')">+ Add Expense</button>
+<a href="{{ url_for('finance_import') }}" class="btn btn-outline">📥 Import</a>
+<a href="{{ url_for('export_donations') }}" class="btn btn-outline">📤 Export CSV</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if fin_admin %}
+<!-- ══════════════════════════════════════════ -->
+<!-- FINANCE ADMIN VIEW — full access           -->
+<!-- ══════════════════════════════════════════ -->
+
+<div class="stats-grid">
+  <div class="stat-card green">
+    <div class="stat-icon">💰</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(this_month_donations) }}</div>
+      <div class="stat-label">This Month's Donations</div>
+    </div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-icon">📤</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(this_month_expenses) }}</div>
+      <div class="stat-label">This Month's Expenses</div>
+    </div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-icon">📈</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(total_donations_all) }}</div>
+      <div class="stat-label">Total All-Time Donations</div>
+    </div>
+  </div>
+  <div class="stat-card {% if net_balance >= 0 %}green{% else %}red{% endif %}">
+    <div class="stat-icon">⚖️</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(net_balance|abs) }}</div>
+      <div class="stat-label">Net Balance {{ '(Surplus)' if net_balance >= 0 else '(Deficit)' }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-group="fin" data-tab="donations" onclick="switchTab('donations','fin')">💰 Donations</button>
+  <button class="tab-btn" data-group="fin" data-tab="breakdown" onclick="switchTab('breakdown','fin')">📊 Breakdown</button>
+</div>
+
+<!-- ALL DONATIONS TAB -->
+<div class="tab-panel active" id="donations" data-group="fin">
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Donor</th><th>Category</th><th>Amount</th><th>Method</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for d in donations %}
+          <tr>
+            <td class="fs-sm">{{ d.donation_date }}</td>
+            <td>
+              {% if d.first_name %}
+              <a href="{{ url_for('member_detail', member_id=d.member_id) }}" style="font-weight:700;color:var(--navy);">
+                {{ d.first_name }} {{ d.last_name }}
+              </a>
+              {% else %}
+              <span style="color:var(--slate);">{{ d.donor_name or 'Anonymous' }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if d.category_name %}
+              <span style="display:inline-flex;align-items:center;gap:5px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:{{ d.color or '#ccc' }};display:inline-block;"></span>
+                {{ d.category_name }}
+              </span>
+              {% else %}—{% endif %}
+            </td>
+            <td class="fw-bold text-success">${{ "%.2f"|format(d.amount) }}</td>
+            <td class="fs-sm text-slate">{{ d.payment_method }}</td>
+            <td>
+              <div style="display:flex;gap:6px;">
+                <button class="btn btn-xs btn-outline"
+                  onclick="openEditDonation({{ d.id }}, '{{ d.member_id or '' }}', '{{ d.donor_name or '' }}', {{ d.amount }}, '{{ d.category_id or '' }}', '{{ d.donation_date }}', '{{ d.payment_method }}', '{{ d.reference_number or '' }}', '{{ d.notes or '' }}')">
+                  Edit
+                </button>
+                <form method="POST" action="{{ url_for('delete_donation', donation_id=d.id) }}" onsubmit="return confirm('Delete this donation record?');">
+                  <button type="submit" class="btn btn-xs btn-danger">✕</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- BREAKDOWN TAB -->
+<div class="tab-panel" id="breakdown" data-group="fin">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><div class="card-title">By Category</div></div>
+      <div class="card-body">
+        {% set max_total = by_category[0].total if by_category else 1 %}
+        {% for cat in by_category %}
+        {% if cat.total > 0 %}
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:0.875rem;">
+            <span style="display:flex;align-items:center;gap:7px;">
+              <span style="width:10px;height:10px;border-radius:50%;background:{{ cat.color }};display:inline-block;"></span>
+              {{ cat.name }}
+            </span>
+            <span class="fw-bold">${{ "%.0f"|format(cat.total) }}</span>
+          </div>
+          <div style="background:var(--ivory2);border-radius:20px;height:8px;">
+            <div style="width:{{ (cat.total/max_total*100)|round }}%;background:{{ cat.color }};height:100%;border-radius:20px;"></div>
+          </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><div class="card-title">Monthly Trend</div></div>
+      <div class="card-body">
+        {% for m in monthly %}
+        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--ivory2);font-size:0.875rem;">
+          <span class="text-slate">{{ m.month }}</span>
+          <span class="fw-bold">${{ "%.0f"|format(m.total) }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT DONATION MODAL -->
+<div class="modal-overlay" id="editDonationModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Edit Donation</div>
+      <button class="modal-close" onclick="closeModal('editDonationModal')">✕</button>
+    </div>
+    <form id="editDonationForm" method="POST">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Member</label>
+            <select id="editDonMember" name="member_id">
+              <option value="">— Anonymous / Non-member —</option>
+              {% for m in members_list %}
+              <option value="{{ m.id }}">{{ m.first_name }} {{ m.last_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Donor Name (if not member)</label>
+            <input type="text" id="editDonName" name="donor_name" placeholder="Anonymous Donor">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Amount *</label>
+            <input type="number" id="editDonAmount" name="amount" step="0.01" min="0" required>
+          </div>
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" id="editDonDate" name="donation_date" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category</label>
+            <select id="editDonCat" name="category_id">
+              <option value="">— Uncategorized —</option>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Payment Method</label>
+            <select id="editDonMethod" name="payment_method">
+              {% for pm in ['cash','e-transfer','cheque','card','online','import'] %}
+              <option value="{{ pm }}">{{ pm|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Reference #</label>
+          <input type="text" id="editDonRef" name="reference_number">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea id="editDonNotes" name="notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('editDonationModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD DONATION MODAL -->
+<div class="modal-overlay" id="addDonationModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">💰 Record Donation</div>
+      <button class="modal-close" onclick="closeModal('addDonationModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_donation') }}">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Member</label>
+            <select name="member_id">
+              <option value="">— Anonymous / Non-member —</option>
+              {% for m in members_list %}
+              <option value="{{ m.id }}">{{ m.first_name }} {{ m.last_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Donor Name (if not member)</label>
+            <input type="text" name="donor_name" placeholder="Leave blank if member selected">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Amount *</label>
+            <input type="number" name="amount" step="0.01" min="0" required placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" name="donation_date" required value="{{ now.strftime('%Y-%m-%d') }}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category</label>
+            <select name="category_id">
+              <option value="">— Uncategorized —</option>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Payment Method</label>
+            <select name="payment_method">
+              {% for pm in ['cash','e-transfer','cheque','card','online'] %}
+              <option value="{{ pm }}">{{ pm|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Reference # / Cheque #</label>
+          <input type="text" name="reference_number" placeholder="Optional">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addDonationModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Record Donation</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD EXPENSE MODAL -->
+<div class="modal-overlay" id="addExpenseModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📤 Add Expense</div>
+      <button class="modal-close" onclick="closeModal('addExpenseModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_expense') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Description *</label>
+          <input type="text" name="description" required placeholder="e.g. Sound equipment rental">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Amount *</label>
+            <input type="number" name="amount" step="0.01" min="0" required placeholder="0.00">
+          </div>
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" name="expense_date" required value="{{ now.strftime('%Y-%m-%d') }}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Category</label>
+            <select name="category_id">
+              <option value="">— Uncategorized —</option>
+              {% for cat in categories %}
+              <option value="{{ cat.id }}">{{ cat.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Payment Method</label>
+            <select name="payment_method">
+              {% for pm in ['cash','e-transfer','cheque','card','online'] %}
+              <option>{{ pm|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Receipt #</label>
+          <input type="text" name="receipt_number" placeholder="Optional">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addExpenseModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Record Expense</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% else %}
+<!-- ══════════════════════════════════════════ -->
+<!-- MEMBER VIEW — own donations only           -->
+<!-- ══════════════════════════════════════════ -->
+
+{% if member %}
+<div class="stats-grid" style="margin-bottom:24px;">
+  <div class="stat-card green">
+    <div class="stat-icon">💰</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(this_year_total) }}</div>
+      <div class="stat-label">My Giving This Year</div>
+    </div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-icon">📊</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(my_total) }}</div>
+      <div class="stat-label">My Total All-Time Giving</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📄</div>
+    <div>
+      <div class="stat-value">{{ my_donations|length }}</div>
+      <div class="stat-label">Total Records</div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">💰 My Donation History</div>
+    <a href="{{ url_for('donation_receipt', member_id=member.id) }}" class="btn btn-sm btn-outline">
+      📄 Get Annual Receipt
+    </a>
+  </div>
+  <div class="card-body" style="padding:0;">
+    {% if my_donations %}
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Category</th><th>Amount</th><th>Method</th></tr>
+      </thead>
+      <tbody>
+        {% for d in my_donations %}
+        <tr>
+          <td class="fs-sm">{{ d.donation_date }}</td>
+          <td>
+            {% if d.category_name %}
+            <span style="display:inline-flex;align-items:center;gap:5px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:{{ d.color }};display:inline-block;"></span>
+              {{ d.category_name }}
+            </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="fw-bold text-success">${{ "%.2f"|format(d.amount) }}</td>
+          <td class="fs-sm text-slate">{{ d.payment_method }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:32px;">
+      <div class="icon">💰</div>
+      <p>No donation records found for your account.</p>
+      <p class="fs-sm text-slate">Records are added by your finance admin.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:48px;">
+    <div style="font-size:3rem;margin-bottom:16px;">💰</div>
+    <h3>No member profile linked</h3>
+    <p style="color:var(--slate);">Ask your admin to add your email to your member profile to see your giving history.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+{% if fin_admin %}
+<script>
+function openEditDonation(id, memberId, donorName, amount, catId, date, method, ref, notes) {
+  document.getElementById('editDonationForm').action = '/finance/donation/' + id + '/edit';
+  document.getElementById('editDonMember').value  = memberId;
+  document.getElementById('editDonName').value    = donorName;
+  document.getElementById('editDonAmount').value  = amount;
+  document.getElementById('editDonCat').value     = catId;
+  document.getElementById('editDonDate').value    = date;
+  document.getElementById('editDonMethod').value  = method;
+  document.getElementById('editDonRef').value     = ref;
+  document.getElementById('editDonNotes').value   = notes;
+  openModal('editDonationModal');
+}
+</script>
+{% endif %}
+{% endblock %}

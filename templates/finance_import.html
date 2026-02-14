@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block title %}Import Donations{% endblock %}
+{% block page_title %}Import Donations{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('finance') }}" class="btn btn-outline">← Back to Finance</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width:700px;">
+
+  {% if results %}
+  <!-- IMPORT RESULTS -->
+  <div class="card mb-2" style="border-left:4px solid {% if results.imported > 0 %}var(--success){% else %}var(--warning){% endif %};">
+    <div class="card-body">
+      <h3 style="margin-bottom:12px;">Import Results</h3>
+      <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px;">
+        <div style="text-align:center;">
+          <div style="font-size:1.8rem;font-weight:700;color:var(--success);">{{ results.imported }}</div>
+          <div class="fs-sm text-slate">Imported</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:1.8rem;font-weight:700;color:var(--warning);">{{ results.skipped }}</div>
+          <div class="fs-sm text-slate">Skipped</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:1.8rem;font-weight:700;color:var(--slate);">{{ results.total }}</div>
+          <div class="fs-sm text-slate">Total Rows</div>
+        </div>
+      </div>
+      {% if results.errors %}
+      <div style="background:#fef2f2;border-radius:7px;padding:12px;font-size:0.78rem;color:#991b1b;">
+        <strong>Errors (first 10):</strong>
+        {% for e in results.errors %}
+        <div>{{ e }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- UPLOAD FORM -->
+  <div class="card mb-2">
+    <div class="card-header"><div class="card-title">📥 Upload CSV File</div></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('finance_import') }}" enctype="multipart/form-data">
+        <div class="form-group">
+          <label>Import Format</label>
+          <select name="import_type" style="padding:10px 14px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.9rem;width:100%;" id="importType" onchange="showFormat(this.value)">
+            <option value="quickbooks">📊 QuickBooks Export (Transaction List)</option>
+            <option value="generic">📄 Generic CSV (our format)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>CSV File *</label>
+          <div style="border:2px dashed var(--ivory2);border-radius:8px;padding:20px;text-align:center;cursor:pointer;"
+               onclick="document.getElementById('csvFile').click()">
+            <div id="csvLabel" style="color:var(--slate);font-size:0.875rem;">
+              <div style="font-size:2rem;margin-bottom:6px;">📄</div>
+              <strong>Click to select CSV file</strong>
+            </div>
+          </div>
+          <input type="file" id="csvFile" name="csv_file" accept=".csv" style="display:none;"
+                 onchange="document.getElementById('csvLabel').innerHTML='✅ ' + this.files[0].name">
+        </div>
+        <button type="submit" class="btn btn-gold">Import Donations</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- QUICKBOOKS INSTRUCTIONS -->
+  <div class="card mb-2" id="qbGuide">
+    <div class="card-header"><div class="card-title">📊 How to Export from QuickBooks</div></div>
+    <div class="card-body" style="font-size:0.875rem;color:var(--slate);line-height:1.9;">
+      <ol style="padding-left:20px;margin:0;">
+        <li>Open QuickBooks Online or Desktop</li>
+        <li>Go to <strong>Reports</strong> → <strong>Transaction List by Date</strong></li>
+        <li>Set your date range (e.g. Jan 1 – Dec 31)</li>
+        <li>Filter by <strong>Transaction Type: Sales Receipt</strong> or <strong>Payment</strong></li>
+        <li>Click <strong>Export</strong> → <strong>Export to CSV</strong></li>
+        <li>Upload the downloaded CSV above</li>
+      </ol>
+      <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:7px;padding:12px 14px;margin-top:14px;">
+        <strong style="color:#166534;">✅ What gets imported automatically:</strong>
+        <ul style="margin:6px 0 0;padding-left:18px;color:#166534;">
+          <li>Transaction date</li>
+          <li>Customer/donor name (matched to member if email matches)</li>
+          <li>Amount</li>
+          <li>Memo/description as notes</li>
+          <li>Account name matched to donation category</li>
+        </ul>
+      </div>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:12px 14px;margin-top:10px;color:#92400e;font-size:0.8rem;">
+        💡 <strong>Full QuickBooks API sync</strong> (automatic two-way) is on the roadmap for when the app is hosted online. The CSV import is the bridge for now.
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERIC CSV FORMAT -->
+  <div class="card" id="genericGuide" style="display:none;">
+    <div class="card-header"><div class="card-title">📄 Generic CSV Format</div></div>
+    <div class="card-body" style="font-size:0.875rem;">
+      <p style="color:var(--slate);margin-bottom:12px;">Your CSV must have these column headers (first row):</p>
+      <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <thead style="background:var(--ivory2);">
+          <tr>
+            <th style="padding:8px 12px;text-align:left;">Column</th>
+            <th style="padding:8px 12px;text-align:left;">Required</th>
+            <th style="padding:8px 12px;text-align:left;">Example</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in [
+            ('date','✅ Yes','2025-01-15'),
+            ('amount','✅ Yes','250.00'),
+            ('donor_name','No','Grace Osei'),
+            ('category','No','Tithes'),
+            ('notes','No','January tithe'),
+          ] %}
+          <tr style="border-bottom:1px solid var(--ivory2);">
+            <td style="padding:8px 12px;font-family:monospace;color:var(--navy);">{{ row[0] }}</td>
+            <td style="padding:8px 12px;">{{ row[1] }}</td>
+            <td style="padding:8px 12px;color:var(--slate);">{{ row[2] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div style="margin-top:14px;background:var(--ivory2);border-radius:7px;padding:12px;font-family:monospace;font-size:0.78rem;color:var(--navy);">
+        date,amount,donor_name,category,notes<br>
+        2025-01-05,250.00,Grace Osei,Tithes,January tithe<br>
+        2025-01-05,100.00,Emmanuel Tetteh,Offerings,<br>
+        2025-01-12,,Anonymous Donor,Special Donations,Building fund
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showFormat(val) {
+  document.getElementById('qbGuide').style.display     = val === 'quickbooks' ? 'block' : 'none';
+  document.getElementById('genericGuide').style.display = val === 'generic'    ? 'block' : 'none';
+}
+</script>
+{% endblock %}

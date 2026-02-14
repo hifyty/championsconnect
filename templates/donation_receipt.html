@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}Donation Receipt — {{ member.first_name }} {{ member.last_name }}{% endblock %}
+{% block page_title %}Donation Receipt{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-gold" onclick="window.print()">🖨️ Print / Save PDF</button>
+<a href="{{ url_for('member_detail', member_id=member.id) }}" class="btn btn-outline">← Back</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- YEAR SELECTOR -->
+<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;">
+  <span style="font-size:0.85rem;color:var(--slate);">View year:</span>
+  {% for y in years %}
+  <a href="{{ url_for('donation_receipt', member_id=member.id, year=y.yr) }}"
+     class="btn btn-sm {% if y.yr|string == year|string %}btn-primary{% else %}btn-outline{% endif %}">
+    {{ y.yr }}
+  </a>
+  {% endfor %}
+</div>
+
+<!-- PRINTABLE RECEIPT -->
+<div id="receipt" style="max-width:680px;background:#fff;border-radius:var(--radius);box-shadow:var(--shadow-lg);overflow:hidden;">
+
+  <!-- Header -->
+  <div style="background:var(--navy);padding:32px 40px;text-align:center;">
+    <div style="color:var(--gold);font-size:1.6rem;font-family:'Playfair Display',serif;font-weight:700;">
+      Champions Connect
+    </div>
+    <div style="color:rgba(255,255,255,.6);font-size:0.75rem;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">
+      Champions Choir Edmonton
+    </div>
+    <div style="color:#fff;font-size:1.1rem;margin-top:16px;font-family:'Playfair Display',serif;">
+      Official Donation Statement — {{ year }}
+    </div>
+  </div>
+
+  <!-- Donor info -->
+  <div style="padding:28px 40px;border-bottom:2px solid var(--ivory2);">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--slate);margin-bottom:4px;">Prepared For</div>
+        <div style="font-size:1.05rem;font-weight:700;">{{ member.first_name }} {{ member.last_name }}</div>
+        {% if member.email %}<div style="color:var(--slate);font-size:0.85rem;">{{ member.email }}</div>{% endif %}
+        {% if member.address %}<div style="color:var(--slate);font-size:0.85rem;">{{ member.address }}</div>{% endif %}
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:0.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--slate);margin-bottom:4px;">Statement Date</div>
+        <div style="font-size:0.9rem;">{{ now.strftime('%B %d, %Y') }}</div>
+        <div style="font-size:0.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--slate);margin:12px 0 4px;">Tax Year</div>
+        <div style="font-size:1.1rem;font-weight:700;color:var(--navy);">{{ year }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Donations table -->
+  <div style="padding:28px 40px;">
+    {% if donations %}
+    <table style="width:100%;border-collapse:collapse;font-size:0.875rem;">
+      <thead>
+        <tr style="background:var(--ivory2);">
+          <th style="padding:10px 14px;text-align:left;font-size:0.7rem;letter-spacing:1px;text-transform:uppercase;color:var(--slate);">Date</th>
+          <th style="padding:10px 14px;text-align:left;font-size:0.7rem;letter-spacing:1px;text-transform:uppercase;color:var(--slate);">Category</th>
+          <th style="padding:10px 14px;text-align:right;font-size:0.7rem;letter-spacing:1px;text-transform:uppercase;color:var(--slate);">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in donations %}
+        <tr style="border-bottom:1px solid var(--ivory2);">
+          <td style="padding:11px 14px;">{{ d.donation_date }}</td>
+          <td style="padding:11px 14px;color:var(--slate);">{{ d.category_name or 'General' }}</td>
+          <td style="padding:11px 14px;text-align:right;font-weight:700;">${{ "%.2f"|format(d.amount) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--navy);">
+          <td colspan="2" style="padding:14px 14px;color:#fff;font-weight:700;font-family:'Playfair Display',serif;">
+            Total Contributions for {{ year }}
+          </td>
+          <td style="padding:14px 14px;text-align:right;color:var(--gold);font-weight:700;font-size:1.1rem;">
+            ${{ "%.2f"|format(total) }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:32px;color:var(--slate);">
+      No donations recorded for {{ year }}.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Footer -->
+  <div style="padding:20px 40px 32px;background:var(--ivory2);border-top:2px solid var(--ivory2);font-size:0.78rem;color:var(--slate);">
+    <p style="margin-bottom:6px;"><strong>Champions Choir Edmonton</strong> · Champions Connect Church Management System</p>
+    <p>This statement is provided for your personal records. Please retain for tax purposes.
+    All donations listed were received in the {{ year }} calendar year.</p>
+    <p style="margin-top:10px;">For questions, contact your church administrator.</p>
+  </div>
+</div>
+
+<style>
+@media print {
+  .sidebar, .topbar, .flash-container, .year-selector { display: none !important; }
+  .main-content { margin-left: 0 !important; }
+  .page-body { padding: 0 !important; }
+  #receipt { box-shadow: none !important; max-width: 100% !important; }
+}
+</style>
+
+{% endblock %}

@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Edit' if member else 'Add' }} Member{% endblock %}
+{% block page_title %}{{ 'Edit Member' if member else 'Add New Member' }}{% endblock %}
+
+{% block content %}
+
+<div style="max-width:740px;">
+  <form method="POST">
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Personal Information</div>
+      </div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>First Name *</label>
+            <input type="text" name="first_name" required value="{{ member.first_name if member else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Last Name *</label>
+            <input type="text" name="last_name" required value="{{ member.last_name if member else '' }}">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email" value="{{ member.email if member else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="tel" name="phone" value="{{ member.phone if member else '' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Address</label>
+          <input type="text" name="address" value="{{ member.address if member else '' }}">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input type="date" name="date_of_birth" value="{{ member.date_of_birth if member else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Join Date</label>
+            <input type="date" name="join_date" value="{{ member.join_date if member else '' }}">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-2">
+      <div class="card-header">
+        <div class="card-title">Choir Details</div>
+      </div>
+      <div class="card-body">
+        <div class="form-row-3">
+          <div class="form-group">
+            <label>Voice Part</label>
+            <select name="voice_part">
+              <option value="">-- Select --</option>
+              {% for vp in ['Soprano','Alto','Tenor','Bass'] %}
+              <option value="{{ vp }}" {{ 'selected' if member and member.voice_part==vp else '' }}>{{ vp }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Section / Role</label>
+            <select name="section">
+              <option value="">-- Select --</option>
+              {% for s in ['Lead','Deputy','General'] %}
+              <option value="{{ s }}" {{ 'selected' if member and member.section==s else '' }}>{{ s }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select name="status">
+              {% for st in ['active','inactive','on_leave'] %}
+              <option value="{{ st }}" {{ 'selected' if member and member.status==st else '' }}>{{ st|replace('_',' ')|title }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-2">
+      <div class="card-header">
+        <div class="card-title">Emergency Contact</div>
+      </div>
+      <div class="card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Contact Name</label>
+            <input type="text" name="emergency_contact_name" value="{{ member.emergency_contact_name if member else '' }}">
+          </div>
+          <div class="form-group">
+            <label>Contact Phone</label>
+            <input type="tel" name="emergency_contact_phone" value="{{ member.emergency_contact_phone if member else '' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes">{{ member.notes if member else '' }}</textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-2">
+      <button type="submit" class="btn btn-gold">
+        {{ '💾 Save Changes' if member else '✅ Add Member' }}
+      </button>
+      <a href="{{ url_for('member_detail', member_id=member.id) if member else url_for('members') }}" class="btn btn-outline">Cancel</a>
+    </div>
+  </form>
+</div>
+
+{% endblock %}

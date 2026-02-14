@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+{% block title %}SMS Settings{% endblock %}
+{% block page_title %}SMS Settings{% endblock %}
+
+{% block content %}
+<div style="max-width:580px;">
+
+  <!-- Status card -->
+  <div class="card mb-2">
+    <div class="card-body" style="display:flex;align-items:center;gap:16px;">
+      <div style="font-size:2.5rem;">💬</div>
+      <div>
+        {% if settings and settings.is_enabled and settings.twilio_account_sid %}
+        <span class="badge badge-active" style="font-size:0.85rem;padding:5px 12px;">✅ SMS Enabled</span>
+        <div class="fs-sm text-slate" style="margin-top:6px;">Sending from: {{ settings.twilio_phone_number or '—' }}</div>
+        {% else %}
+        <span class="badge badge-inactive" style="font-size:0.85rem;padding:5px 12px;">⚠️ SMS Not Configured</span>
+        <div class="fs-sm text-slate" style="margin-top:6px;">Configure Twilio below to enable SMS reminders</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- How to get Twilio -->
+  <div class="card mb-2">
+    <div class="card-header"><div class="card-title">📖 How to Set Up Twilio (Free)</div></div>
+    <div class="card-body" style="font-size:0.875rem;color:var(--slate);line-height:1.8;">
+      <ol style="margin:0;padding-left:20px;">
+        <li>Go to <a href="https://www.twilio.com/try-twilio" target="_blank" style="color:var(--navy);font-weight:700;">twilio.com/try-twilio</a> and create a free account</li>
+        <li>Verify your phone number during signup</li>
+        <li>From your <strong>Console Dashboard</strong>, copy your <strong>Account SID</strong> and <strong>Auth Token</strong></li>
+        <li>Get a free Twilio phone number: Console → Phone Numbers → Get a Number</li>
+        <li>Paste all three values below and click Save</li>
+      </ol>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:10px 12px;margin-top:12px;font-size:0.78rem;color:#92400e;">
+        💡 Free Twilio accounts can only send SMS to verified numbers. For full sending, upgrade to a paid plan (~$1/month + $0.0075/SMS in Canada).
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings form -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">⚙️ Twilio Credentials</div></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('sms_settings_page') }}">
+        <div class="form-group">
+          <label>Account SID</label>
+          <input type="text" name="twilio_account_sid"
+                 value="{{ settings.twilio_account_sid or '' }}"
+                 placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+        </div>
+        <div class="form-group">
+          <label>Auth Token</label>
+          <input type="password" name="twilio_auth_token"
+                 value="{{ settings.twilio_auth_token or '' }}"
+                 placeholder="Your Twilio auth token">
+        </div>
+        <div class="form-group">
+          <label>Twilio Phone Number</label>
+          <input type="text" name="twilio_phone_number"
+                 value="{{ settings.twilio_phone_number or '' }}"
+                 placeholder="+14165550100">
+          <small style="color:var(--slate);font-size:0.78rem;">Include country code, e.g. +1 for Canada/USA</small>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;cursor:pointer;">
+            <input type="checkbox" name="is_enabled" {% if settings and settings.is_enabled %}checked{% endif %} style="width:16px;height:16px;">
+            <span>Enable SMS sending</span>
+          </label>
+        </div>
+        <button type="submit" class="btn btn-gold">Save SMS Settings</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Member phone numbers status -->
+  <div class="card mt-2">
+    <div class="card-header">
+      <div class="card-title">📱 Members with Phone Numbers</div>
+      <a href="{{ url_for('members') }}" class="btn btn-sm btn-outline">Manage Members</a>
+    </div>
+    <div class="card-body">
+      {% set members_with_phone = namespace(count=0) %}
+      <p style="color:var(--slate);font-size:0.875rem;">
+        Make sure active members have their phone numbers saved in their profile so SMS reminders reach them.
+        Go to <a href="{{ url_for('members') }}" style="color:var(--navy);font-weight:700;">Member Directory</a> to update any missing numbers.
+      </p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

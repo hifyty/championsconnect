@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% block title %}QuickBooks Sync{% endblock %}
+{% block page_title %}QuickBooks Integration{% endblock %}
+
+{% block content %}
+
+<!-- STATUS BANNER -->
+<div class="card mb-2" style="border-left:4px solid {% if settings and settings.is_connected %}var(--success){% else %}var(--warning){% endif %};">
+  <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;">
+    <div style="display:flex;align-items:center;gap:16px;">
+      <div style="font-size:2.5rem;">📊</div>
+      <div>
+        {% if settings and settings.is_connected %}
+        <div style="font-size:1rem;font-weight:700;color:var(--success);">✅ Connected to QuickBooks</div>
+        <div class="fs-sm text-slate">Company: <strong>{{ settings.company_name or 'Unknown' }}</strong></div>
+        {% if settings.last_sync_at %}
+        <div class="fs-sm text-slate">Last sync: {{ settings.last_sync_at[:16] }}</div>
+        {% endif %}
+        {% else %}
+        <div style="font-size:1rem;font-weight:700;color:var(--warning);">⚠️ Not Connected</div>
+        <div class="fs-sm text-slate">Connect to enable two-way sync with QuickBooks Online</div>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      {% if settings and settings.is_connected %}
+      <form method="POST" action="{{ url_for('qb_disconnect') }}" onsubmit="return confirm('Disconnect QuickBooks?');">
+        <button type="submit" class="btn btn-outline btn-sm">Disconnect</button>
+      </form>
+      {% else %}
+      <a href="{{ url_for('qb_connect') }}" class="btn btn-gold">
+        🔗 Connect QuickBooks
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if settings and settings.is_connected %}
+<!-- ══ SYNC ACTIONS ══ -->
+<div class="grid-2" style="margin-bottom:24px;align-items:start;">
+
+  <!-- Pull FROM QuickBooks -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">⬇️ Pull from QuickBooks</div>
+    </div>
+    <div class="card-body">
+      <p class="fs-sm text-slate" style="margin-bottom:14px;">
+        Import data from QuickBooks into Champions Connect. New records only — won't overwrite existing matched data.
+      </p>
+      <form method="POST" action="{{ url_for('qb_sync_from_qb') }}">
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+          {% for val, label, desc in [
+            ('customers',      '👥 Customers → Members',           'Import QB customers as choir members'),
+            ('chart_of_accounts','📂 Chart of Accounts → Categories','Map QB income accounts to donation categories'),
+            ('payments',       '💰 Sales Receipts → Donations',    'Import QB payments as donation records'),
+            ('expenses',       '📤 Purchases → Expenses',          'Import QB bills and purchases as expenses'),
+          ] %}
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--ivory2);border-radius:7px;cursor:pointer;">
+            <input type="checkbox" name="sync_types" value="{{ val }}" checked style="margin-top:2px;width:15px;height:15px;">
+            <div>
+              <div style="font-weight:700;font-size:0.875rem;">{{ label }}</div>
+              <div class="fs-sm text-slate">{{ desc }}</div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-primary w-100">⬇️ Pull from QuickBooks Now</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Push TO QuickBooks -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">⬆️ Push to QuickBooks</div>
+    </div>
+    <div class="card-body">
+      <p class="fs-sm text-slate" style="margin-bottom:14px;">
+        Push data from Champions Connect to QuickBooks. Only pushes records not yet in QB (checks for QB ID).
+      </p>
+      <form method="POST" action="{{ url_for('qb_sync_to_qb') }}">
+        <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
+          {% for val, label, desc in [
+            ('members',   '👥 Members → QB Customers',       'Create new members as QB customers'),
+            ('donations', '💰 Donations → Sales Receipts',   'Push donations as QB sales receipts'),
+          ] %}
+          <label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border:1.5px solid var(--ivory2);border-radius:7px;cursor:pointer;">
+            <input type="checkbox" name="push_types" value="{{ val }}" checked style="margin-top:2px;width:15px;height:15px;">
+            <div>
+              <div style="font-weight:700;font-size:0.875rem;">{{ label }}</div>
+              <div class="fs-sm text-slate">{{ desc }}</div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+        <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:10px 12px;font-size:0.78rem;color:#92400e;margin-bottom:14px;">
+          ⚠️ QuickBooks is the financial source of truth. Only push records you're confident about.
+        </div>
+        <button type="submit" class="btn btn-gold w-100">⬆️ Push to QuickBooks Now</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% else %}
+<!-- ══ SETUP GUIDE ══ -->
+<div class="grid-2" style="align-items:start;margin-bottom:24px;">
+
+  <!-- Credentials form -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">⚙️ QuickBooks Credentials</div></div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('qb_save_settings') }}">
+        <div class="form-group">
+          <label>Client ID</label>
+          <input type="text" name="client_id" value="{{ settings.client_id or '' }}"
+                 placeholder="From Intuit Developer Portal">
+        </div>
+        <div class="form-group">
+          <label>Client Secret</label>
+          <input type="password" name="client_secret" value="{{ settings.client_secret or '' }}"
+                 placeholder="From Intuit Developer Portal">
+        </div>
+        <div class="form-group">
+          <label>Redirect URI</label>
+          <input type="text" name="redirect_uri" value="{{ settings.redirect_uri or '' }}"
+                 placeholder="https://yourapp.onrender.com/quickbooks/callback">
+          <small class="fs-sm text-slate">Must match exactly what you set in the Intuit portal</small>
+        </div>
+        <button type="submit" class="btn btn-gold">Save Credentials</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Setup guide -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">📖 Setup Guide</div></div>
+    <div class="card-body" style="font-size:0.875rem;color:var(--slate);line-height:1.9;">
+      <ol style="padding-left:20px;margin:0;">
+        <li>Go to <a href="https://developer.intuit.com" target="_blank" style="color:var(--navy);font-weight:700;">developer.intuit.com</a></li>
+        <li>Create a new app → Select <strong>QuickBooks Online</strong></li>
+        <li>Under <strong>Keys & OAuth</strong>, copy your <strong>Client ID</strong> and <strong>Client Secret</strong></li>
+        <li>Add your <strong>Redirect URI</strong>:<br>
+          <code style="background:var(--ivory2);padding:2px 6px;border-radius:4px;font-size:0.78rem;">
+            https://yourapp.onrender.com/quickbooks/callback
+          </code>
+        </li>
+        <li>Paste credentials above and click Save</li>
+        <li>Click <strong>Connect QuickBooks</strong> to authorize</li>
+      </ol>
+      <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:7px;padding:10px 12px;margin-top:12px;color:#991b1b;font-size:0.8rem;">
+        🔒 <strong>Requires live hosting.</strong> QuickBooks OAuth will not work on localhost — the Redirect URI must be a public HTTPS URL. This works once the app is deployed to Render.com.
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- SYNC LOG -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">📋 Sync History</div>
+  </div>
+  <div class="card-body" style="padding:0;">
+    {% if sync_log %}
+    <table>
+      <thead>
+        <tr><th>Time</th><th>Type</th><th>Direction</th><th>Records</th><th>Status</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        {% for log in sync_log %}
+        <tr>
+          <td class="fs-sm">{{ log.synced_at[:16] if log.synced_at else '—' }}</td>
+          <td class="fw-bold fs-sm">{{ log.sync_type|replace('_',' ')|title }}</td>
+          <td>
+            <span class="badge" style="background:{% if 'qb_to' in log.direction %}#eff6ff;color:#1e40af;{% else %}#f0fdf4;color:#166534;{% endif %}">
+              {{ '⬇️ QB → CC' if 'qb_to' in log.direction else '⬆️ CC → QB' }}
+            </span>
+          </td>
+          <td>{{ log.records_synced }}</td>
+          <td>
+            <span class="badge badge-{% if log.status == 'success' %}active{% else %}inactive{% endif %}">
+              {{ log.status }}
+            </span>
+          </td>
+          <td class="fs-sm text-slate">{{ log.notes or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:28px;">
+      <div class="icon" style="font-size:2rem;">📊</div>
+      <p>No sync history yet. Connect QuickBooks to get started.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

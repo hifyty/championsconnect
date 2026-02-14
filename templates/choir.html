@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% block title %}Choir Hub{% endblock %}
+{% block page_title %}🎵 Choir Hub{% endblock %}
+
+{% block topbar_actions %}
+{% if is_admin %}
+<button class="btn btn-gold" onclick="openModal('addChoirMemberModal')">+ Add Choir Member</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{% if is_admin %}
+<!-- ══ CHOIR ADMIN VIEW ══ -->
+<div class="tabs">
+  <button class="tab-btn active" data-group="choir" data-tab="choirRoster" onclick="switchTab('choirRoster','choir')">🎶 Choir Roster ({{ choir_roster|length }})</button>
+  <button class="tab-btn" data-group="choir" data-tab="choirSchedule" onclick="switchTab('choirSchedule','choir')">📋 Upcoming Duties</button>
+  <button class="tab-btn" data-group="choir" data-tab="choirAdd" onclick="switchTab('choirAdd','choir')">➕ Add Members</button>
+</div>
+
+<!-- CHOIR ROSTER -->
+<div class="tab-panel active" id="choirRoster" data-group="choir">
+  {% if choir_roster %}
+  {% set voice_groups = {'Soprano': [], 'Alto': [], 'Tenor': [], 'Bass': []} %}
+  {% for cm in choir_roster %}
+    {% if cm.voice_part in voice_groups %}{% set _ = voice_groups[cm.voice_part].append(cm) %}{% endif %}
+  {% endfor %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;">
+    {% for voice, color in [('Soprano','#ec4899'),('Alto','#8b5cf6'),('Tenor','#3b82f6'),('Bass','#1a2744')] %}
+    {% set group = choir_roster | selectattr('voice_part','equalto',voice) | list %}
+    {% if group %}
+    <div class="card">
+      <div style="background:{{ color }};padding:12px 18px;border-radius:var(--radius) var(--radius) 0 0;">
+        <div style="color:#fff;font-weight:700;font-size:0.9rem;">{{ voice }}</div>
+        <div style="color:rgba(255,255,255,.7);font-size:0.78rem;">{{ group|length }} member{{ 's' if group|length != 1 }}</div>
+      </div>
+      <div class="card-body" style="padding:8px 0;">
+        {% for cm in group %}
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 16px;border-bottom:1px solid var(--ivory2);">
+          <div>
+            <div class="fw-bold fs-sm">{{ cm.first_name }} {{ cm.last_name }}</div>
+            <div style="font-size:0.75rem;color:var(--slate);">{{ cm.section }} · {{ cm.email or 'no email' }}</div>
+          </div>
+          <form method="POST" action="{{ url_for('choir_remove_member', member_id=cm.member_id) }}"
+                onsubmit="return confirm('Remove {{ cm.first_name }} from choir?');">
+            <button type="submit" class="btn btn-xs btn-danger">✕</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="icon">🎵</div><h3>No choir members yet</h3><p>Add members using the button above.</p></div>
+  {% endif %}
+</div>
+
+<!-- UPCOMING DUTIES -->
+<div class="tab-panel" id="choirSchedule" data-group="choir">
+  {% if upcoming_duties %}
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      <table>
+        <thead><tr><th>Date</th><th>Member</th><th>Voice</th><th>Duty</th><th>Service</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for d in upcoming_duties %}
+          <tr>
+            <td class="fw-bold fs-sm">{{ d.scheduled_date }}</td>
+            <td>{{ d.first_name }} {{ d.last_name }}</td>
+            <td><span class="voice-badge voice-{{ d.voice_part }}">{{ d.voice_part }}</span></td>
+            <td>{{ d.duty_type }}</td>
+            <td class="fs-sm text-slate">{{ d.service_type }}</td>
+            <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state"><p>No upcoming duties. <a href="{{ url_for('roster') }}">Go to Roster →</a></p></div>
+  {% endif %}
+</div>
+
+<!-- ADD MEMBERS -->
+<div class="tab-panel" id="choirAdd" data-group="choir">
+  {% if non_choir %}
+  <div class="card">
+    <div class="card-header"><div class="card-title">Members not yet in Choir</div></div>
+    <div class="card-body" style="padding:0;">
+      <table>
+        <thead><tr><th>Name</th><th>Current Voice</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for m in non_choir %}
+          <tr>
+            <td class="fw-bold">{{ m.first_name }} {{ m.last_name }}</td>
+            <td>{{ m.voice_part or '—' }}</td>
+            <td><span class="badge badge-{{ m.status }}">{{ m.status }}</span></td>
+            <td>
+              <button class="btn btn-sm btn-gold"
+                onclick="quickAddChoir({{ m.id }}, '{{ m.first_name }} {{ m.last_name }}', '{{ m.voice_part or '' }}')">
+                + Add to Choir
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state"><p>All active members are already in the choir!</p></div>
+  {% endif %}
+</div>
+
+{% elif choir_member %}
+<!-- ══ CHOIR MEMBER VIEW — their schedule ══ -->
+<div style="background:linear-gradient(135deg,var(--navy),#2d3f7a);border-radius:var(--radius);padding:24px 28px;margin-bottom:20px;color:#fff;">
+  <div style="color:var(--gold);font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">Your Choir Role</div>
+  <div style="font-size:1.3rem;font-weight:700;font-family:'Playfair Display',serif;">{{ choir_member.voice_part }} · {{ choir_member.section }}</div>
+  <div style="color:rgba(255,255,255,.6);font-size:0.82rem;margin-top:4px;">Member since {{ choir_member.join_date or 'N/A' }}</div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">📋 My Upcoming Duties</div>
+    <a href="{{ url_for('roster') }}" class="btn btn-sm btn-outline">Full Roster</a>
+  </div>
+  <div class="card-body" style="padding:0;">
+    {% if my_duties %}
+    <table>
+      <thead><tr><th>Date</th><th>Duty</th><th>Service</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for d in my_duties %}
+        <tr>
+          <td class="fw-bold fs-sm">{{ d.scheduled_date }}</td>
+          <td>{{ d.duty_type }}</td>
+          <td class="fs-sm text-slate">{{ d.service_type }}</td>
+          <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:28px;">
+      <div class="icon">📋</div>
+      <p>No upcoming duties assigned yet.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% else %}
+<!-- ══ NON-CHOIR MEMBER ══ -->
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:48px;">
+    <div style="font-size:3rem;margin-bottom:16px;">🎵</div>
+    <h3>You're not currently in the choir</h3>
+    <p style="color:var(--slate);">Contact your choir director to be added to the choir roster.</p>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- ADD CHOIR MEMBER MODAL -->
+<div class="modal-overlay" id="addChoirMemberModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🎵 Add Member to Choir</div>
+      <button class="modal-close" onclick="closeModal('addChoirMemberModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('choir_add_member') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Member *</label>
+          <select id="choirMemberSelect" name="member_id" required>
+            <option value="">— Select member —</option>
+            {% for m in non_choir %}
+            <option value="{{ m.id }}">{{ m.first_name }} {{ m.last_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Voice Part *</label>
+            <select id="choirVoiceSelect" name="voice_part" required>
+              <option value="">—</option>
+              {% for vp in ['Soprano','Alto','Tenor','Bass'] %}
+              <option>{{ vp }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Section</label>
+            <select name="section">
+              <option>General</option>
+              <option>Lead</option>
+              <option>Deputy</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Join Date</label>
+          <input type="date" name="join_date" value="{{ now.strftime('%Y-%m-%d') }}">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addChoirMemberModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Add to Choir</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function quickAddChoir(id, name, voice) {
+  document.getElementById('choirMemberSelect').value = id;
+  document.getElementById('choirVoiceSelect').value  = voice;
+  openModal('addChoirMemberModal');
+}
+</script>
+{% endblock %}

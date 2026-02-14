@@ -1,0 +1,306 @@
+{% extends 'base.html' %}
+{% block title %}News & Prayer{% endblock %}
+{% block page_title %}News & Prayer{% endblock %}
+
+{% block topbar_actions %}
+{% if session.get('role') in ['super_admin','admin','content_admin'] %}
+<button class="btn btn-gold" onclick="openModal('addNewsModal')">+ Post Update</button>
+{% endif %}
+{% if session.get('role') == 'admin' %}
+<button class="btn btn-outline" onclick="openModal('scriptureModal')">✏️ Set Scripture</button>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- TOP ROW: Daily Verse + Scripture of Month -->
+<div class="grid-2" style="margin-bottom:24px;">
+
+  <!-- PRAYER VERSE OF THE DAY -->
+  <div style="background:linear-gradient(135deg,var(--navy) 0%,#243560 100%);border-radius:var(--radius);padding:28px;color:#fff;position:relative;overflow:hidden;">
+    <div style="position:absolute;top:-20px;right:-20px;font-size:100px;opacity:.06;">🙏</div>
+    <div style="color:var(--gold);font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">
+      Prayer Verse of the Day
+    </div>
+    {% if daily_verse %}
+    <blockquote style="font-family:'Playfair Display',serif;font-size:1.05rem;line-height:1.7;margin:0 0 14px;font-style:italic;">
+      "{{ daily_verse.verse_text }}"
+    </blockquote>
+    <div style="color:var(--gold);font-size:0.85rem;font-weight:700;">— {{ daily_verse.reference }}</div>
+    {% else %}
+    <p style="opacity:.7;">No verses in pool yet. Add some below!</p>
+    {% endif %}
+    <div style="color:rgba(255,255,255,.4);font-size:0.72rem;margin-top:12px;">
+      Changes daily · {{ now.strftime('%B %d, %Y') }}
+    </div>
+  </div>
+
+  <!-- SCRIPTURE OF THE MONTH -->
+  <div style="background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:28px;border-top:4px solid var(--gold);">
+    <div style="color:var(--gold);font-size:0.7rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;">
+      📖 Scripture of the Month — {{ now.strftime('%B %Y') }}
+    </div>
+    {% if scripture %}
+    {% if scripture.theme %}
+    <div style="display:inline-block;background:var(--ivory2);padding:3px 10px;border-radius:20px;font-size:0.75rem;color:var(--slate);margin-bottom:12px;">
+      Theme: {{ scripture.theme }}
+    </div>
+    {% endif %}
+    <blockquote style="font-family:'Playfair Display',serif;font-size:1rem;line-height:1.7;color:var(--navy);margin:0 0 14px;font-style:italic;border-left:3px solid var(--gold);padding-left:16px;">
+      "{{ scripture.scripture_text }}"
+    </blockquote>
+    <div style="color:var(--navy);font-size:0.85rem;font-weight:700;">— {{ scripture.reference }}</div>
+    {% else %}
+    <p style="color:var(--slate);">No scripture set for this month yet.</p>
+    {% endif %}
+    {% if session.get('role') == 'admin' %}
+    <button class="btn btn-sm btn-outline" style="margin-top:14px;" onclick="openModal('scriptureModal')">✏️ Update</button>
+    {% endif %}
+  </div>
+</div>
+
+<!-- NEWS POSTS -->
+<div class="page-header">
+  <div>
+    <h2>This Week's Updates</h2>
+    <div class="subtitle">{{ posts|length }} post{{ 's' if posts|length != 1 else '' }} published</div>
+  </div>
+</div>
+
+{% if posts %}
+<div style="display:flex;flex-direction:column;gap:16px;">
+  {% for post in posts %}
+  <div class="card" style="{% if post.pinned %}border-left:4px solid var(--gold);{% endif %}">
+    <div class="card-body">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+        <div style="flex:1;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;">
+            {% if post.pinned %}
+            <span style="font-size:0.7rem;background:#fef9c3;color:#854d0e;padding:2px 8px;border-radius:20px;font-weight:700;">📌 PINNED</span>
+            {% endif %}
+            <span class="badge" style="
+              {% if post.category == 'announcement' %}background:#eff6ff;color:#1e40af;
+              {% elif post.category == 'event' %}background:#f0fdf4;color:#166534;
+              {% elif post.category == 'praise_report' %}background:#fdf4ff;color:#7e22ce;
+              {% else %}background:var(--ivory2);color:var(--slate);{% endif %}">
+              {% if post.category == 'announcement' %}📢{% elif post.category == 'event' %}📅{% elif post.category == 'praise_report' %}🙌{% else %}📝{% endif %}
+              {{ post.category|replace('_',' ')|title }}
+            </span>
+            <span style="color:var(--slate);font-size:0.78rem;">{{ post.created_at[:10] if post.created_at else '' }}</span>
+            {% if post.first_name %}
+            <span style="color:var(--slate);font-size:0.78rem;">by {{ post.first_name }} {{ post.last_name }}</span>
+            {% endif %}
+          </div>
+          <h3 style="font-size:1.05rem;margin-bottom:8px;">{{ post.title }}</h3>
+          <p style="color:var(--slate);line-height:1.7;font-size:0.9rem;">{{ post.body[:200] }}{% if post.body|length > 200 %}…{% endif %}</p>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:10px 0 0;">
+          <div style="display:flex;gap:12px;align-items:center;">
+            <a href="{{ url_for('news_post_detail', post_id=post.id) }}" class="btn btn-sm btn-outline">Read More →</a>
+            <span style="font-size:0.82rem;color:var(--slate);">
+              {% if post.id in liked_ids %}❤️{% else %}🤍{% endif %} {{ post.likes_count or 0 }}
+              &nbsp;·&nbsp; 💬 {{ post.comments_count or 0 }}
+            </span>
+          </div>
+          {% if session.get('role') in ['super_admin','admin','content_admin'] %}
+          <form method="POST" action="{{ url_for('delete_news', post_id=post.id) }}" onsubmit="return confirm('Delete this post?');">
+            <button type="submit" class="btn btn-xs btn-danger">✕ Delete</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="icon">📰</div>
+  <h3>No posts yet</h3>
+  <p>Click <strong>+ Post Update</strong> to share the first announcement.</p>
+</div>
+{% endif %}
+
+<!-- SOCIAL FEED PANEL -->
+{% if social_posts %}
+<div style="margin-top:32px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+    <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--navy);">📱 Latest from Our Socials</h3>
+    {% if session.get('role') in ['super_admin','admin'] %}
+    <form method="POST" action="{{ url_for('social_refresh') }}" style="margin-left:auto;">
+      <button type="submit" class="btn btn-xs btn-outline">🔄 Refresh</button>
+    </form>
+    {% endif %}
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;">
+    {% for sp in social_posts %}
+    <div class="card" style="overflow:hidden;">
+      {% if sp.image_url %}
+      <img src="{{ sp.image_url }}" alt="Social post" style="width:100%;height:160px;object-fit:cover;display:block;">
+      {% endif %}
+      <div class="card-body">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span style="font-size:0.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:{% if sp.platform=='facebook' %}#1877f2{% else %}#c13584{% endif %};">
+            {% if sp.platform == 'facebook' %}📘 Facebook{% else %}📸 Instagram{% endif %}
+          </span>
+          <span class="fs-sm text-slate">· {{ sp.posted_at[:10] if sp.posted_at else '' }}</span>
+        </div>
+        {% if sp.message %}
+        <p style="font-size:0.82rem;color:var(--slate);line-height:1.6;margin:0 0 8px;">
+          {{ sp.message[:120] }}{% if sp.message|length > 120 %}…{% endif %}
+        </p>
+        {% endif %}
+        {% if sp.post_url %}
+        <a href="{{ sp.post_url }}" target="_blank" class="btn btn-xs btn-outline">View Post →</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- ADMIN: PRAYER VERSE POOL -->
+{% if session.get('role') == 'admin' %}
+<div class="card mt-3">
+  <div class="card-header">
+    <div class="card-title">🙏 Prayer Verse Pool (Admin)</div>
+    <button class="btn btn-sm btn-gold" onclick="openModal('addVerseModal')">+ Add Verse</button>
+  </div>
+  <div class="card-body" style="padding:0;">
+    {% if verses_pool %}
+    <table>
+      <thead><tr><th>Reference</th><th>Verse</th><th></th></tr></thead>
+      <tbody>
+        {% for v in verses_pool %}
+        <tr>
+          <td class="fw-bold" style="white-space:nowrap;">{{ v.reference }}</td>
+          <td style="color:var(--slate);font-size:0.875rem;max-width:400px;">{{ v.verse_text[:120] }}{{ '...' if v.verse_text|length > 120 else '' }}</td>
+          <td>
+            <form method="POST" action="{{ url_for('delete_verse', verse_id=v.id) }}" onsubmit="return confirm('Remove verse?');">
+              <button type="submit" class="btn btn-xs btn-danger">✕</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state" style="padding:24px;"><p>No verses in pool yet.</p></div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+
+<!-- MODALS -->
+
+<!-- Add News Post -->
+<div class="modal-overlay" id="addNewsModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📢 Post Update</div>
+      <button class="modal-close" onclick="closeModal('addNewsModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_news') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Title *</label>
+          <input type="text" name="title" placeholder="e.g. Rehearsal this Saturday" required>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category">
+            <option value="announcement">📢 Announcement</option>
+            <option value="event">📅 Event</option>
+            <option value="praise_report">🙌 Praise Report</option>
+            <option value="notice">📝 Notice</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Message *</label>
+          <textarea name="body" rows="5" placeholder="Write your update here..." required></textarea>
+        </div>
+        <div style="display:flex;gap:20px;">
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.875rem;text-transform:none;letter-spacing:0;cursor:pointer;">
+            <input type="checkbox" name="is_published" checked> Publish now
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:0.875rem;text-transform:none;letter-spacing:0;cursor:pointer;">
+            <input type="checkbox" name="pinned"> 📌 Pin to top
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addNewsModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Publish Post</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Set Scripture of Month (Admin) -->
+<div class="modal-overlay" id="scriptureModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📖 Set Scripture of the Month</div>
+      <button class="modal-close" onclick="closeModal('scriptureModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('set_scripture') }}">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Month (YYYY-MM) *</label>
+            <input type="month" name="month_year" value="{{ now.strftime('%Y-%m') }}" required>
+          </div>
+          <div class="form-group">
+            <label>Theme</label>
+            <input type="text" name="theme" placeholder="e.g. Faith & Perseverance"
+              value="{{ scripture.theme if scripture else '' }}">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Scripture Reference *</label>
+          <input type="text" name="reference" placeholder="e.g. Psalm 100:1-2" required
+            value="{{ scripture.reference if scripture else '' }}">
+        </div>
+        <div class="form-group">
+          <label>Scripture Text *</label>
+          <textarea name="scripture_text" rows="4" required
+            placeholder="Type the full scripture text here...">{{ scripture.scripture_text if scripture else '' }}</textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('scriptureModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Save Scripture</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add Verse to Pool (Admin) -->
+<div class="modal-overlay" id="addVerseModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🙏 Add Prayer Verse</div>
+      <button class="modal-close" onclick="closeModal('addVerseModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_verse') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Reference *</label>
+          <input type="text" name="reference" placeholder="e.g. John 3:16" required>
+        </div>
+        <div class="form-group">
+          <label>Verse Text *</label>
+          <textarea name="verse_text" rows="4" placeholder="Type the full verse here..." required></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addVerseModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Add to Pool</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

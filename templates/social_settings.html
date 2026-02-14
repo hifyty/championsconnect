@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+{% block title %}Social Media Feeds{% endblock %}
+{% block page_title %}📱 Social Media Feeds{% endblock %}
+
+{% block content %}
+<div style="max-width:680px;">
+
+  <!-- Status -->
+  <div class="card mb-2">
+    <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+      <div>
+        <div class="fw-bold">Social Feed Display</div>
+        <div class="fs-sm text-slate">Configured feeds appear in the News & Blog page for all members</div>
+      </div>
+      <form method="POST" action="{{ url_for('social_refresh') }}">
+        <button type="submit" class="btn btn-gold">🔄 Refresh Feeds Now</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Facebook -->
+  <div class="card mb-2">
+    <div class="card-header">
+      <div class="card-title">Facebook Page</div>
+      <span class="badge {% if fb and fb.is_enabled %}badge-active{% else %}badge-inactive{% endif %}">
+        {{ '✅ Enabled' if fb and fb.is_enabled else '⚠️ Not configured' }}
+      </span>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('social_settings') }}">
+        <input type="hidden" name="platform" value="facebook">
+        <div class="form-group">
+          <label>Page Handle / Name</label>
+          <input type="text" name="handle" value="{{ fb.handle or '' }}" placeholder="e.g. ChampionsChoirEdmonton">
+        </div>
+        <div class="form-group">
+          <label>Page ID</label>
+          <input type="text" name="page_id" value="{{ fb.page_id or '' }}" placeholder="Numeric Facebook Page ID">
+          <small class="fs-sm text-slate">Find it: Facebook Page → About → Page transparency</small>
+        </div>
+        <div class="form-group">
+          <label>Page Access Token</label>
+          <input type="password" name="access_token" value="{{ fb.access_token or '' }}"
+                 placeholder="Long-lived Page Access Token">
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer;">
+            <input type="checkbox" name="is_enabled" {% if fb and fb.is_enabled %}checked{% endif %} style="width:15px;height:15px;">
+            Enable Facebook feed display
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Facebook Settings</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Instagram -->
+  <div class="card mb-2">
+    <div class="card-header">
+      <div class="card-title">Instagram</div>
+      <span class="badge {% if ig and ig.is_enabled %}badge-active{% else %}badge-inactive{% endif %}">
+        {{ '✅ Enabled' if ig and ig.is_enabled else '⚠️ Not configured' }}
+      </span>
+    </div>
+    <div class="card-body">
+      <form method="POST" action="{{ url_for('social_settings') }}">
+        <input type="hidden" name="platform" value="instagram">
+        <div class="form-group">
+          <label>Instagram Handle</label>
+          <input type="text" name="handle" value="{{ ig.handle or '' }}" placeholder="e.g. @championsconnect">
+        </div>
+        <div class="form-group">
+          <label>Instagram Business Account ID</label>
+          <input type="text" name="page_id" value="{{ ig.page_id or '' }}" placeholder="Instagram Business Account ID">
+        </div>
+        <div class="form-group">
+          <label>Access Token</label>
+          <input type="password" name="access_token" value="{{ ig.access_token or '' }}"
+                 placeholder="Facebook Graph API token (same app as Facebook)">
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0;cursor:pointer;">
+            <input type="checkbox" name="is_enabled" {% if ig and ig.is_enabled %}checked{% endif %} style="width:15px;height:15px;">
+            Enable Instagram feed display
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">Save Instagram Settings</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- How to get tokens -->
+  <div class="card">
+    <div class="card-header"><div class="card-title">📖 How to Get Access Tokens</div></div>
+    <div class="card-body" style="font-size:0.875rem;color:var(--slate);line-height:1.9;">
+      <ol style="padding-left:20px;margin:0;">
+        <li>Go to <a href="https://developers.facebook.com" target="_blank" style="color:var(--navy);font-weight:700;">developers.facebook.com</a></li>
+        <li>Create an App → Business type → Add <strong>Facebook Login</strong> and <strong>Pages API</strong></li>
+        <li>Go to <strong>Graph API Explorer</strong> → Select your Page → Generate Token</li>
+        <li>Permissions needed: <code style="background:var(--ivory2);padding:1px 5px;border-radius:3px;">pages_read_engagement, pages_show_list</code></li>
+        <li>For Instagram: also add <code style="background:var(--ivory2);padding:1px 5px;border-radius:3px;">instagram_basic, instagram_content_publish</code></li>
+        <li>Convert to a long-lived token (valid 60 days) using Token Debugger</li>
+        <li>Paste the tokens above and click <strong>Refresh Feeds Now</strong></li>
+      </ol>
+      <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:10px 12px;margin-top:12px;color:#92400e;font-size:0.8rem;">
+        💡 Tokens expire every 60 days. When they expire, just generate a new one and paste it here. Full token auto-refresh comes with hosting.
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

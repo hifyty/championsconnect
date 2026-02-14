@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Join Q&A · Champions Connect</title>
+  <style>
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family: 'Georgia', serif; background:#0f172a; color:#fff; min-height:100vh; display:flex; flex-direction:column; }
+
+    .header { background:#1a2744; padding:16px 20px; display:flex; align-items:center; gap:12px; border-bottom:2px solid #c9a84c; }
+    .logo { color:#c9a84c; font-size:1.1rem; font-weight:700; }
+    .logo span { color:#fff; font-weight:400; }
+
+    .container { flex:1; padding:24px 20px; max-width:500px; margin:0 auto; width:100%; }
+
+    /* Session closed banner */
+    .closed-banner { background:#7f1d1d; border:1px solid #ef4444; border-radius:10px; padding:14px 18px; text-align:center; margin-bottom:20px; }
+
+    /* Question form */
+    .qa-card { background:#1e293b; border-radius:12px; padding:20px; margin-bottom:16px; }
+    .qa-card h2 { color:#c9a84c; font-size:1rem; font-family:Georgia,serif; margin-bottom:6px; }
+    .qa-card .subtitle { color:#94a3b8; font-size:0.82rem; margin-bottom:16px; }
+    textarea { width:100%; background:#0f172a; border:1.5px solid #334155; border-radius:8px; color:#fff; padding:12px; font-size:0.95rem; font-family:Georgia,serif; resize:vertical; min-height:90px; outline:none; }
+    textarea:focus { border-color:#c9a84c; }
+    input[type=text] { width:100%; background:#0f172a; border:1.5px solid #334155; border-radius:8px; color:#fff; padding:10px 12px; font-size:0.9rem; font-family:Georgia,serif; outline:none; }
+    input[type=text]:focus { border-color:#c9a84c; }
+    .char-count { text-align:right; font-size:0.75rem; color:#64748b; margin-top:4px; }
+    .btn-submit { width:100%; background:#c9a84c; color:#1a2744; border:none; border-radius:8px; padding:13px; font-size:1rem; font-weight:700; cursor:pointer; margin-top:12px; font-family:Georgia,serif; }
+    .btn-submit:disabled { opacity:0.5; cursor:not-allowed; }
+    .btn-submit:active { background:#b8963e; }
+    label { display:block; color:#94a3b8; font-size:0.78rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; margin-top:12px; }
+
+    /* Success state */
+    .success-state { text-align:center; padding:24px; }
+    .success-state .icon { font-size:3rem; margin-bottom:12px; }
+    .success-state h3 { color:#c9a84c; margin-bottom:6px; }
+    .success-state p { color:#94a3b8; font-size:0.875rem; }
+    .btn-another { background:transparent; border:1.5px solid #c9a84c; color:#c9a84c; border-radius:8px; padding:10px 20px; font-size:0.875rem; cursor:pointer; margin-top:16px; font-family:Georgia,serif; }
+
+    /* Live question feed */
+    .questions-section h3 { color:#c9a84c; font-size:0.85rem; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
+    .q-item { background:#1e293b; border-radius:10px; padding:14px 16px; margin-bottom:10px; display:flex; gap:12px; align-items:flex-start; border:1px solid #334155; }
+    .q-item.featured { border-color:#c9a84c; background:#1a2744; }
+    .q-item.answered { opacity:0.5; }
+    .vote-col { display:flex; flex-direction:column; align-items:center; min-width:40px; }
+    .vote-btn { background:transparent; border:1.5px solid #334155; color:#94a3b8; border-radius:6px; padding:5px 8px; cursor:pointer; font-size:0.85rem; transition:all .2s; }
+    .vote-btn.voted { border-color:#c9a84c; color:#c9a84c; background:rgba(201,168,76,.1); }
+    .vote-count { font-size:0.75rem; color:#94a3b8; margin-top:3px; }
+    .q-text { flex:1; font-size:0.9rem; line-height:1.6; color:#e2e8f0; }
+    .q-meta { font-size:0.72rem; color:#64748b; margin-top:4px; }
+    .q-featured-badge { font-size:0.7rem; background:#c9a84c; color:#1a2744; padding:2px 7px; border-radius:10px; font-weight:700; display:inline-block; margin-bottom:4px; }
+    .q-answered-badge { font-size:0.7rem; background:#22c55e; color:#fff; padding:2px 7px; border-radius:10px; display:inline-block; margin-bottom:4px; }
+
+    /* Join code entry */
+    .join-form { background:#1e293b; border-radius:12px; padding:28px 24px; text-align:center; }
+    .join-form h2 { color:#c9a84c; margin-bottom:6px; }
+    .join-form p { color:#94a3b8; font-size:0.875rem; margin-bottom:20px; }
+    .code-input { width:100%; background:#0f172a; border:2px solid #334155; border-radius:8px; color:#fff; padding:14px; font-size:1.4rem; font-family:monospace; text-align:center; text-transform:uppercase; letter-spacing:4px; outline:none; }
+    .code-input:focus { border-color:#c9a84c; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>✝️</div>
+  <div class="logo">Champions Connect <span>· Live Q&A</span></div>
+</div>
+
+<div class="container">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  {% for cat, msg in messages %}
+  <div style="background:{% if cat=='danger' %}#7f1d1d{% else %}#14532d{% endif %};border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:0.875rem;">{{ msg }}</div>
+  {% endfor %}
+  {% endif %}
+  {% endwith %}
+
+  <div class="join-form">
+    <div style="font-size:2.5rem;margin-bottom:12px;">💬</div>
+    <h2>Join a Q&A Session</h2>
+    <p>Enter the 6-character code shown by your host</p>
+    <form method="POST" action="{{ url_for('qa_join_landing') }}">
+      <input class="code-input" type="text" name="code" maxlength="6" placeholder="ABC123"
+             autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false">
+      <button type="submit" class="btn-submit" style="margin-top:16px;">Join Session →</button>
+    </form>
+  </div>
+
+</div>
+</body>
+</html>

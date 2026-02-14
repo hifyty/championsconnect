@@ -1,0 +1,227 @@
+{% extends 'base.html' %}
+{% block title %}Duty Roster{% endblock %}
+{% block page_title %}Choir Duty Roster{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-gold" onclick="openModal('addDutyModal')">+ Assign Duty</button>
+{% endblock %}
+
+{% block content %}
+
+<!-- TABS -->
+<div class="tabs">
+  <button class="tab-btn active" data-group="roster" data-tab="upcoming" onclick="switchTab('upcoming','roster')">
+    📅 Upcoming ({{ grouped|length }} dates)
+  </button>
+  <button class="tab-btn" data-group="roster" data-tab="history" onclick="switchTab('history','roster')">
+    🕐 Past Duties
+  </button>
+</div>
+
+<!-- UPCOMING TAB -->
+<div class="tab-panel active" id="upcoming" data-group="roster">
+  {% if grouped %}
+    {% for date_str, duties in grouped.items() %}
+    <div class="roster-day">
+      <div class="roster-day-header">
+        <div class="roster-day-title">
+          {% set d = date_str.split('-') %}
+          Sunday Service — {{ date_str }}
+        </div>
+        <div class="roster-day-meta">{{ duties[0].service_type }}</div>
+      </div>
+      <div class="duty-grid">
+        {% for duty in duties %}
+        <div class="duty-card">
+          <div class="duty-type">{{ duty.duty_type }}</div>
+          <div class="duty-name">{{ duty.first_name }} {{ duty.last_name }}</div>
+          <div class="duty-voice">{{ duty.voice_part }} · {{ duty.section }}</div>
+          <div style="margin-top:10px;display:flex;gap:5px;align-items:center;">
+            <span class="badge badge-{{ duty.status }}">{{ duty.status }}</span>
+            {% if session.get('role') in ['admin','finance'] %}
+            <button class="btn btn-xs btn-outline" style="margin-left:4px;"
+              onclick="openReminderModal({{ duty.id }}, '{{ duty.first_name }} {{ duty.last_name }}', '{{ duty.duty_type }}', '{{ duty.scheduled_date }}')">
+              🔔 Remind
+            </button>
+            {% endif %}
+            <form method="POST" action="{{ url_for('delete_duty', duty_id=duty.id) }}" style="margin-left:auto;" onsubmit="return confirm('Remove this duty?');">
+              <button type="submit" class="btn btn-xs btn-danger">✕</button>
+            </form>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">📋</div>
+    <h3>No upcoming duties</h3>
+    <p>Assign duties using the button above.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- PAST DUTIES TAB -->
+<div class="tab-panel" id="history" data-group="roster">
+  {% if past %}
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      <table>
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Duty</th>
+            <th>Date</th>
+            <th>Service</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in past %}
+          <tr>
+            <td>
+              <strong>{{ d.first_name }} {{ d.last_name }}</strong>
+              <div class="fs-sm text-slate">{{ d.voice_part }}</div>
+            </td>
+            <td>{{ d.duty_type }}</td>
+            <td class="fs-sm">{{ d.scheduled_date }}</td>
+            <td class="fs-sm text-slate">{{ d.service_type }}</td>
+            <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">🕐</div>
+    <p>No past duties recorded yet.</p>
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- ADD DUTY MODAL -->
+<div class="modal-overlay" id="addDutyModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">📋 Assign Duty</div>
+      <button class="modal-close" onclick="closeModal('addDutyModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_duty') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Member *</label>
+          <select name="member_id" required>
+            <option value="">-- Select Member --</option>
+            {% for m in members_list %}
+            <option value="{{ m.id }}">{{ m.first_name }} {{ m.last_name }} ({{ m.voice_part }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Duty Type *</label>
+            <select name="duty_type" required>
+              <option value="">-- Select --</option>
+              {% for dt in ['Worship Leader','Keyboard','Drums','Bass Guitar','Announcements','Offering','Prayer','Usher','Sound Tech','Projection','Choir Director','Soloist'] %}
+              <option value="{{ dt }}">{{ dt }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Service Type</label>
+            <select name="service_type">
+              {% for st in ['Sunday Service','Midweek Service','Special Event','Concert','Workshop'] %}
+              <option value="{{ st }}">{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" name="scheduled_date" required>
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" rows="2"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addDutyModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Assign Duty</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- REMINDER MODAL -->
+<div class="modal-overlay" id="reminderModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🔔 Send Duty Reminder</div>
+      <button class="modal-close" onclick="closeModal('reminderModal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="reminderInfo" style="background:var(--ivory2);border-radius:8px;padding:14px 16px;margin-bottom:18px;font-size:0.875rem;">
+        <strong id="rMember"></strong> — <span id="rDuty"></span><br>
+        <span style="color:var(--slate);">📅 <span id="rDate"></span></span>
+      </div>
+
+      <!-- SEND NOW -->
+      <form method="POST" action="{{ url_for('send_reminder_now') }}" style="margin-bottom:20px;">
+        <input type="hidden" name="duty_id" id="sendNowDutyId">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Send Immediately</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <select name="reminder_type" style="flex:1;padding:9px 12px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.875rem;">
+            <option value="email">📧 Email only</option>
+            <option value="sms">💬 SMS only</option>
+            <option value="both">📧 + 💬 Email & SMS</option>
+          </select>
+          <button type="submit" class="btn btn-gold">Send Now</button>
+        </div>
+      </form>
+
+      <div style="border-top:1px solid var(--ivory2);padding-top:18px;">
+        <div style="font-size:0.78rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Schedule for Later</div>
+        <form method="POST" action="{{ url_for('schedule_reminder') }}">
+          <input type="hidden" name="duty_id" id="schedDutyId">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+            <select name="remind_when" style="flex:1;padding:9px 12px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.875rem;">
+              <option value="same_day_morning">⏰ Same day morning</option>
+              <option value="1_day_before">📅 1 day before</option>
+              <option value="3_days_before">📅 3 days before</option>
+              <option value="1_week_before">📅 1 week before</option>
+            </select>
+            <select name="reminder_type" style="flex:1;padding:9px 12px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.875rem;">
+              <option value="email">📧 Email</option>
+              <option value="sms">💬 SMS</option>
+              <option value="both">📧 + 💬 Both</option>
+            </select>
+          </div>
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:7px;padding:10px 12px;font-size:0.78rem;color:#92400e;margin-bottom:10px;">
+            ⚠️ Automated scheduling activates when the app is hosted online. For now, use <strong>Send Now</strong> on the morning of the duty.
+          </div>
+          <button type="submit" class="btn btn-outline w-100">Save Scheduled Reminder</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openReminderModal(dutyId, member, duty, date) {
+  document.getElementById('rMember').textContent = member;
+  document.getElementById('rDuty').textContent   = duty;
+  document.getElementById('rDate').textContent   = date;
+  document.getElementById('sendNowDutyId').value = dutyId;
+  document.getElementById('schedDutyId').value   = dutyId;
+  openModal('reminderModal');
+}
+</script>
+{% endblock %}

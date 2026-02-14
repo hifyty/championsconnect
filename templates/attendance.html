@@ -1,0 +1,273 @@
+{% extends 'base.html' %}
+{% block title %}Attendance{% endblock %}
+{% block page_title %}Attendance Tracking{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-gold" onclick="openModal('quickAttendanceModal')">✅ Mark Today's Service</button>
+<button class="btn btn-outline" onclick="openModal('addRehearsalModal')">+ Add Rehearsal</button>
+{% endblock %}
+
+{% block content %}
+
+<div class="tabs">
+  <button class="tab-btn active" data-group="att" data-tab="memberRates" onclick="switchTab('memberRates','att')">👥 Member Rates</button>
+  <button class="tab-btn" data-group="att" data-tab="services" onclick="switchTab('services','att')">⛪ Services</button>
+  <button class="tab-btn" data-group="att" data-tab="rehearsals" onclick="switchTab('rehearsals','att')">🎵 Rehearsals</button>
+</div>
+
+<!-- MEMBER ATTENDANCE RATES -->
+<div class="tab-panel active" id="memberRates" data-group="att">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Member Attendance Rates</div>
+      <span class="fs-sm text-slate">All-time service attendance</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Member</th><th>Voice</th><th>Services Attended</th><th>Total Recorded</th><th>Rate</th></tr>
+        </thead>
+        <tbody>
+          {% for m in member_rates %}
+          {% set rate = ((m.attended / m.total_services * 100)|round|int) if m.total_services > 0 else 0 %}
+          <tr>
+            <td>
+              <a href="{{ url_for('member_detail', member_id=m.id) }}" style="font-weight:700;color:var(--navy);">
+                {{ m.first_name }} {{ m.last_name }}
+              </a>
+            </td>
+            <td><span class="voice-badge voice-{{ m.voice_part }}">{{ m.voice_part or '—' }}</span></td>
+            <td>{{ m.attended or 0 }}</td>
+            <td>{{ m.total_services or 0 }}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div style="flex:1;background:var(--ivory2);border-radius:20px;height:8px;min-width:80px;">
+                  <div style="width:{{ rate }}%;background:{% if rate>=80 %}var(--success){% elif rate>=60 %}var(--warning){% else %}var(--danger){% endif %};height:100%;border-radius:20px;"></div>
+                </div>
+                <span style="font-weight:700;font-size:0.85rem;min-width:36px;">{{ rate }}%</span>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- SERVICES TAB -->
+<div class="tab-panel" id="services" data-group="att">
+  {% if services %}
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      <table>
+        <thead>
+          <tr><th>Date</th><th>Service</th><th>Present</th><th>Absent</th><th>Excused</th><th>Rate</th></tr>
+        </thead>
+        <tbody>
+          {% for s in services %}
+          {% set rate = ((s.present / s.total * 100)|round|int) if s.total > 0 else 0 %}
+          <tr>
+            <td class="fw-bold">{{ s.service_date }}</td>
+            <td class="fs-sm text-slate">{{ s.service_type }}</td>
+            <td class="text-success fw-bold">{{ s.present }}</td>
+            <td class="text-danger">{{ s.absent }}</td>
+            <td class="text-slate">{{ s.excused }}</td>
+            <td>
+              <span style="font-weight:700;color:{% if rate>=80 %}var(--success){% elif rate>=60 %}var(--warning){% else %}var(--danger){% endif %}">
+                {{ rate }}%
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">⛪</div>
+    <h3>No service attendance recorded yet</h3>
+    <p>Click <strong>Mark Today's Service</strong> to get started.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- REHEARSALS TAB -->
+<div class="tab-panel" id="rehearsals" data-group="att">
+  {% if rehearsals %}
+  <div style="display:flex;flex-direction:column;gap:14px;">
+    {% for r in rehearsals %}
+    <div class="card">
+      <div class="card-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <div>
+            <div class="fw-bold" style="font-size:1rem;">{{ r.title }}</div>
+            <div class="fs-sm text-slate" style="margin-top:3px;">
+              📅 {{ r.rehearsal_date }}
+              {% if r.start_time %} · {{ r.start_time }}{% if r.end_time %} – {{ r.end_time }}{% endif %}{% endif %}
+              · 📍 {{ r.location or 'Main Hall' }}
+            </div>
+            {% if r.notes %}<div class="fs-sm text-slate" style="margin-top:4px;">{{ r.notes }}</div>{% endif %}
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            {% if r.recorded > 0 %}
+            <span class="badge badge-active">{{ r.present }}/{{ r.recorded }} present</span>
+            {% else %}
+            <span class="badge badge-scheduled">Not marked</span>
+            {% endif %}
+            <button class="btn btn-sm btn-gold" onclick="openMarkModal({{ r.id }}, '{{ r.title }}', '{{ r.rehearsal_date }}')">Mark Attendance</button>
+            {% if session.get('role') == 'admin' %}
+            <form method="POST" action="{{ url_for('delete_rehearsal', rehearsal_id=r.id) }}" onsubmit="return confirm('Delete rehearsal?');">
+              <button type="submit" class="btn btn-sm btn-danger">✕</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">🎵</div>
+    <h3>No rehearsals scheduled</h3>
+    <p>Click <strong>+ Add Rehearsal</strong> to schedule one.</p>
+  </div>
+  {% endif %}
+</div>
+
+
+<!-- QUICK SERVICE ATTENDANCE MODAL -->
+<div class="modal-overlay" id="quickAttendanceModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title">✅ Mark Service Attendance</div>
+      <button class="modal-close" onclick="closeModal('quickAttendanceModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('quick_service_attendance') }}">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Service Date *</label>
+            <input type="date" name="service_date" required value="{{ now.strftime('%Y-%m-%d') }}">
+          </div>
+          <div class="form-group">
+            <label>Service Type</label>
+            <select name="service_type">
+              {% for st in ['Sunday Service','Midweek Service','Special Service','Prayer Meeting'] %}
+              <option>{{ st }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div style="margin-bottom:10px;font-size:0.82rem;color:var(--slate);">
+          Check the box for each member who was <strong>present</strong>. Unchecked = absent.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:340px;overflow-y:auto;padding:4px;">
+          {% for m in active_members %}
+          <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--ivory2);border-radius:7px;cursor:pointer;font-size:0.875rem;">
+            <input type="checkbox" name="present" value="{{ m.id }}" checked style="width:16px;height:16px;">
+            <div>
+              <div class="fw-bold">{{ m.first_name }} {{ m.last_name }}</div>
+              <div class="fs-sm text-slate">{{ m.voice_part }}</div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('quickAttendanceModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Save Attendance</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ADD REHEARSAL MODAL -->
+<div class="modal-overlay" id="addRehearsalModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🎵 Schedule Rehearsal</div>
+      <button class="modal-close" onclick="closeModal('addRehearsalModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_rehearsal') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" name="title" value="Weekly Choir Practice" required>
+        </div>
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" name="rehearsal_date" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start Time</label>
+            <input type="time" name="start_time" value="10:00">
+          </div>
+          <div class="form-group">
+            <label>End Time</label>
+            <input type="time" name="end_time" value="12:00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Location</label>
+          <input type="text" name="location" value="Main Hall">
+        </div>
+        <div class="form-group">
+          <label>Notes</label>
+          <textarea name="notes" rows="2" placeholder="e.g. Bring sheet music for Sunday..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addRehearsalModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Schedule</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MARK REHEARSAL ATTENDANCE MODAL (dynamic) -->
+<div class="modal-overlay" id="markRehearsalModal">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-header">
+      <div class="modal-title" id="markModalTitle">Mark Rehearsal Attendance</div>
+      <button class="modal-close" onclick="closeModal('markRehearsalModal')">✕</button>
+    </div>
+    <form id="markRehearsalForm" method="POST">
+      <div class="modal-body">
+        <div style="margin-bottom:10px;font-size:0.82rem;color:var(--slate);">
+          Check each member who was <strong>present</strong>.
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:340px;overflow-y:auto;padding:4px;">
+          {% for m in active_members %}
+          <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--ivory2);border-radius:7px;cursor:pointer;font-size:0.875rem;">
+            <input type="checkbox" name="present" value="{{ m.id }}" checked style="width:16px;height:16px;">
+            <div>
+              <div class="fw-bold">{{ m.first_name }} {{ m.last_name }}</div>
+              <div class="fs-sm text-slate">{{ m.voice_part }}</div>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('markRehearsalModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Save Attendance</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openMarkModal(id, title, date) {
+  document.getElementById('markModalTitle').textContent = '✅ ' + title + ' — ' + date;
+  document.getElementById('markRehearsalForm').action = '/attendance/rehearsal/' + id + '/mark';
+  openModal('markRehearsalModal');
+}
+</script>
+{% endblock %}

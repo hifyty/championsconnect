@@ -1,0 +1,148 @@
+{% extends 'base.html' %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="stats-grid">
+  <div class="stat-card blue">
+    <div class="stat-icon">👥</div>
+    <div>
+      <div class="stat-value">{{ total_members }}</div>
+      <div class="stat-label">Active Members</div>
+    </div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon">💰</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(total_donations) }}</div>
+      <div class="stat-label">This Month's Donations</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📋</div>
+    <div>
+      <div class="stat-value">{{ upcoming_duties|length }}</div>
+      <div class="stat-label">Upcoming Duties</div>
+    </div>
+  </div>
+  <div class="stat-card purple">
+    <div class="stat-icon">🎵</div>
+    <div>
+      <div class="stat-value">
+        {% set parts = [] %}
+        {% for row in member_breakdown %}{% set _ = parts.append(row['count']) %}{% endfor %}
+        {{ parts|sum if parts else 0 }}
+      </div>
+      <div class="stat-label">Choir Voices Logged</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <!-- UPCOMING DUTIES -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📋 Upcoming Duties</div>
+      <a href="{{ url_for('roster') }}" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if upcoming_duties %}
+      <table>
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Duty</th>
+            <th>Date</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in upcoming_duties %}
+          <tr>
+            <td>
+              <strong>{{ d.first_name }} {{ d.last_name }}</strong>
+              <div class="fs-sm text-slate">{{ d.voice_part }}</div>
+            </td>
+            <td>{{ d.duty_type }}</td>
+            <td class="fs-sm">{{ d.scheduled_date }}</td>
+            <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>No upcoming duties scheduled</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- RECENT DONATIONS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">💰 Recent Donations</div>
+      <a href="{{ url_for('finance') }}" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if recent_donations %}
+      <table>
+        <thead>
+          <tr>
+            <th>Donor</th>
+            <th>Category</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in recent_donations %}
+          <tr>
+            <td>
+              <strong>
+                {% if d.first_name %}{{ d.first_name }} {{ d.last_name }}
+                {% elif d.donor_name %}{{ d.donor_name }}
+                {% else %}Anonymous{% endif %}
+              </strong>
+              <div class="fs-sm text-slate">{{ d.donation_date }}</div>
+            </td>
+            <td>
+              <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ d.color or '#ccc' }};margin-right:5px;"></span>
+              {{ d.category_name or 'General' }}
+            </td>
+            <td class="fw-bold text-success">${{ "%.2f"|format(d.amount) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="icon">💰</div>
+        <p>No donations recorded yet</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- VOICE BREAKDOWN -->
+{% if member_breakdown %}
+<div class="card mt-2">
+  <div class="card-header">
+    <div class="card-title">🎶 Choir Voice Distribution</div>
+  </div>
+  <div class="card-body">
+    <div class="d-flex gap-2" style="flex-wrap:wrap;">
+      {% for row in member_breakdown %}
+      <div style="background:var(--ivory2);border-radius:10px;padding:18px 28px;text-align:center;flex:1;min-width:100px;">
+        <div style="font-size:1.8rem;font-weight:700;color:var(--navy);">{{ row.count }}</div>
+        <div style="font-size:0.8rem;color:var(--slate);margin-top:4px;">{{ row.voice_part or 'Unassigned' }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

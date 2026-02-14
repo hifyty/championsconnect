@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+{% block title %}Manage: {{ qa_s.title }}{% endblock %}
+{% block page_title %}⚙️ Manage Session{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('qa_dashboard') }}" class="btn btn-outline">← Back</a>
+<a href="{{ url_for('qa_present', code=qa_s.join_code) }}" class="btn btn-gold" target="_blank">📺 Open Presenter View</a>
+<a href="{{ url_for('qa_audience', code=qa_s.join_code) }}" class="btn btn-outline" target="_blank">👁️ Audience Preview</a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Session header -->
+<div style="background:var(--ivory2);border-radius:var(--radius);padding:16px 22px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+  <div>
+    <div class="fw-bold" style="font-size:1rem;">{{ qa_s.title }}</div>
+    <div class="fs-sm text-slate">{{ qa_s.description or 'No description' }}</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+    <div style="text-align:center;">
+      <div style="font-size:1.4rem;font-weight:700;font-family:monospace;color:var(--navy);letter-spacing:3px;background:#fff;padding:6px 14px;border-radius:7px;border:2px solid var(--navy);">{{ qa_s.join_code }}</div>
+      <div class="fs-sm text-slate" style="margin-top:3px;">Join code</div>
+    </div>
+    <div style="text-align:center;">
+      <span class="badge badge-{% if qa_s.status == 'active' %}active{% else %}inactive{% endif %}" style="font-size:0.85rem;padding:6px 12px;">
+        {{ '🟢 Live' if qa_s.status == 'active' else '⚫ Closed' }}
+      </span>
+    </div>
+    {% if qa_s.status == 'active' %}
+    <form method="POST" action="{{ url_for('qa_close', session_id=qa_s.id) }}">
+      <button type="submit" class="btn btn-sm btn-danger">⏹ Close Session</button>
+    </form>
+    {% else %}
+    <form method="POST" action="{{ url_for('qa_reopen', session_id=qa_s.id) }}">
+      <button type="submit" class="btn btn-sm btn-outline">▶️ Reopen</button>
+    </form>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Live stats bar -->
+<div class="stats-grid" style="margin-bottom:20px;">
+  {% set visible_qs = questions | selectattr('status','equalto','visible') | list %}
+  {% set pending_qs = questions | selectattr('status','equalto','pending') | list %}
+  {% set answered_qs = questions | selectattr('is_answered','equalto',1) | list %}
+  <div class="stat-card blue"><div class="stat-icon">💬</div><div><div class="stat-value">{{ questions|length }}</div><div class="stat-label">Total Questions</div></div></div>
+  <div class="stat-card green"><div class="stat-icon">👁️</div><div><div class="stat-value">{{ visible_qs|length }}</div><div class="stat-label">Visible</div></div></div>
+  {% if qa_s.moderation %}
+  <div class="stat-card"><div class="stat-icon">⏳</div><div><div class="stat-value">{{ pending_qs|length }}</div><div class="stat-label">Pending Approval</div></div></div>
+  {% endif %}
+  <div class="stat-card"><div class="stat-icon">✅</div><div><div class="stat-value">{{ answered_qs|length }}</div><div class="stat-label">Answered</div></div></div>
+</div>
+
+<!-- Questions list -->
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">Questions</div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-xs btn-outline filter-btn active" data-filter="all" onclick="filterQs('all',this)">All</button>
+      {% if qa_s.moderation %}
+      <button class="btn btn-xs btn-outline filter-btn" data-filter="pending" onclick="filterQs('pending',this)">⏳ Pending</button>
+      {% endif %}
+      <button class="btn btn-xs btn-outline filter-btn" data-filter="visible" onclick="filterQs('visible',this)">👁️ Visible</button>
+      <button class="btn btn-xs btn-outline filter-btn" data-filter="answered" onclick="filterQs('answered',this)">✅ Answered</button>
+      <button class="btn btn-xs btn-outline filter-btn" data-filter="hidden" onclick="filterQs('hidden',this)">🚫 Hidden</button>
+    </div>
+  </div>
+  <div id="questionsList">
+    {% if questions %}
+    {% for q in questions %}
+    <div class="q-row" data-status="{{ q.status }}" data-answered="{{ q.is_answered }}"
+         id="qrow-{{ q.id }}"
+         style="padding:14px 20px;border-bottom:1px solid var(--ivory2);display:flex;align-items:flex-start;gap:14px;
+         {% if q.is_featured %}background:#fffbeb;border-left:4px solid var(--gold);{% endif %}
+         {% if q.status == 'hidden' %}opacity:0.45;{% endif %}
+         {% if q.is_answered %}background:#f0fdf4;{% endif %}">
+
+      <!-- Vote count -->
+      <div style="text-align:center;min-width:42px;">
+        <div style="font-size:1.2rem;font-weight:700;color:var(--navy);">{{ q.vote_count }}</div>
+        <div style="font-size:0.65rem;color:var(--slate);text-transform:uppercase;">votes</div>
+      </div>
+
+      <!-- Question text -->
+      <div style="flex:1;">
+        <div style="font-size:0.95rem;line-height:1.6;color:#1e293b;{% if q.is_answered %}text-decoration:line-through;color:var(--slate);{% endif %}">
+          {{ q.question_text }}
+        </div>
+        <div style="margin-top:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="fs-sm text-slate">{{ q.submitter_name }}</span>
+          <span class="fs-sm text-slate">· {{ q.created_at[11:16] if q.created_at else '' }}</span>
+          {% if q.is_featured %}<span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.68rem;">⭐ Featured</span>{% endif %}
+          {% if q.is_answered %}<span class="badge badge-active" style="font-size:0.68rem;">✅ Answered</span>{% endif %}
+          {% if q.status == 'hidden' %}<span class="badge badge-inactive" style="font-size:0.68rem;">🚫 Hidden</span>{% endif %}
+          {% if q.status == 'pending' %}<span class="badge badge-scheduled" style="font-size:0.68rem;">⏳ Pending</span>{% endif %}
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;min-width:180px;">
+        {% if q.status == 'pending' %}
+        <button class="btn btn-xs btn-gold" onclick="qAction({{ q.id }},'approve')">✅ Approve</button>
+        {% endif %}
+        {% if not q.is_featured and q.status == 'visible' and not q.is_answered %}
+        <button class="btn btn-xs btn-outline" onclick="qAction({{ q.id }},'feature')" title="Feature on presenter screen">⭐ Feature</button>
+        {% elif q.is_featured %}
+        <button class="btn btn-xs btn-outline" onclick="qAction({{ q.id }},'unfeature')">✕ Unfeature</button>
+        {% endif %}
+        {% if not q.is_answered and q.status == 'visible' %}
+        <button class="btn btn-xs btn-outline" onclick="qAction({{ q.id }},'answered')" title="Mark as answered">✅ Done</button>
+        {% endif %}
+        {% if q.status != 'hidden' %}
+        <button class="btn btn-xs btn-danger" onclick="qAction({{ q.id }},'hide')">🚫</button>
+        {% else %}
+        <button class="btn btn-xs btn-outline" onclick="qAction({{ q.id }},'approve')">↩️</button>
+        {% endif %}
+        <button class="btn btn-xs btn-danger" onclick="qAction({{ q.id }},'delete')" title="Delete permanently">🗑️</button>
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="empty-state" style="padding:32px;">
+      <div class="icon">💬</div>
+      <p>No questions yet. Share the join code <strong>{{ qa_s.join_code }}</strong> with your audience.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function qAction(qId, action) {
+  if (action === 'delete' && !confirm('Delete this question permanently?')) return;
+  const resp = await fetch(`/qa/question/${qId}/action`, {
+    method: 'POST',
+    headers: {'Content-Type':'application/x-www-form-urlencoded'},
+    body: `action=${action}`
+  });
+  const data = await resp.json();
+  if (data.ok) {
+    // Reload to reflect changes
+    location.reload();
+  }
+}
+
+function filterQs(filter, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.q-row').forEach(row => {
+    const status   = row.dataset.status;
+    const answered = row.dataset.answered === '1';
+    if (filter === 'all')     row.style.display = '';
+    else if (filter === 'pending')  row.style.display = status === 'pending'  ? '' : 'none';
+    else if (filter === 'visible')  row.style.display = status === 'visible' && !answered ? '' : 'none';
+    else if (filter === 'answered') row.style.display = answered ? '' : 'none';
+    else if (filter === 'hidden')   row.style.display = status === 'hidden'   ? '' : 'none';
+  });
+}
+
+// Auto-refresh every 5 seconds when session is live
+{% if qa_s.status == 'active' %}
+setInterval(() => location.reload(), 5000);
+{% endif %}
+</script>
+<style>
+.filter-btn.active { background:var(--navy);color:#fff;border-color:var(--navy); }
+</style>
+{% endblock %}

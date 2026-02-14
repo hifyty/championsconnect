@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block title %}Q&A Sessions{% endblock %}
+{% block page_title %}💬 Live Q&A{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-gold" onclick="openModal('createSessionModal')">+ New Session</button>
+{% endblock %}
+
+{% block content %}
+
+<!-- HOW IT WORKS -->
+<div style="background:linear-gradient(135deg,var(--navy),#2d3f7a);border-radius:var(--radius);padding:22px 28px;margin-bottom:24px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+  <div style="flex:1;min-width:200px;">
+    <div style="color:var(--gold);font-size:0.7rem;letter-spacing:2px;text-transform:uppercase;margin-bottom:6px;">How It Works</div>
+    <div style="color:#fff;font-size:0.95rem;line-height:1.8;">
+      Create a session → Share the join code → Audience visits <strong style="color:var(--gold);">{{ request.host }}/qa/CODE</strong> on their phone → Questions appear live on your presenter screen
+    </div>
+  </div>
+  <div style="display:flex;gap:14px;flex-wrap:wrap;">
+    {% for icon, label in [('1️⃣','Create session'),('2️⃣','Share code'),('3️⃣','Collect questions'),('4️⃣','Present live')] %}
+    <div style="text-align:center;color:rgba(255,255,255,.8);font-size:0.75rem;min-width:64px;">
+      <div style="font-size:1.6rem;">{{ icon }}</div>{{ label }}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- MY SESSIONS -->
+<div class="card mb-2">
+  <div class="card-header">
+    <div class="card-title">📋 My Sessions</div>
+  </div>
+  {% if my_sessions %}
+  <div class="card-body" style="padding:0;">
+    <table>
+      <thead>
+        <tr><th>Session</th><th>Code</th><th>Questions</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for s in my_sessions %}
+        <tr>
+          <td>
+            <div class="fw-bold">{{ s.title }}</div>
+            <div class="fs-sm text-slate">{{ s.description or '' }} · {{ s.created_at[:10] }}</div>
+          </td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-family:monospace;font-size:1.1rem;font-weight:700;color:var(--navy);background:var(--ivory2);padding:4px 10px;border-radius:6px;letter-spacing:2px;">{{ s.join_code }}</span>
+              <button onclick="copyCode('{{ s.join_code }}')" class="btn btn-xs btn-outline" title="Copy">📋</button>
+            </div>
+          </td>
+          <td>
+            <span style="font-size:1.1rem;font-weight:700;color:var(--navy);">{{ s.q_count }}</span>
+            <span class="fs-sm text-slate">question{{ 's' if s.q_count != 1 }}</span>
+          </td>
+          <td>
+            <span class="badge badge-{% if s.status == 'active' %}active{% else %}inactive{% endif %}">
+              {{ '🟢 Live' if s.status == 'active' else '⚫ Closed' }}
+            </span>
+            {% if s.moderation %}<span class="badge badge-scheduled" style="margin-left:4px;">🛡️ Moderated</span>{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <a href="{{ url_for('qa_manage', session_id=s.id) }}" class="btn btn-xs btn-outline">⚙️ Manage</a>
+              <a href="{{ url_for('qa_present', code=s.join_code) }}" class="btn btn-xs btn-gold" target="_blank">📺 Present</a>
+              <a href="{{ url_for('qa_audience', code=s.join_code) }}" class="btn btn-xs btn-outline" target="_blank">👁️ Preview</a>
+              {% if s.status == 'active' %}
+              <form method="POST" action="{{ url_for('qa_close', session_id=s.id) }}">
+                <button type="submit" class="btn btn-xs btn-danger">⏹ Close</button>
+              </form>
+              {% else %}
+              <form method="POST" action="{{ url_for('qa_reopen', session_id=s.id) }}">
+                <button type="submit" class="btn btn-xs btn-outline">▶️ Reopen</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state" style="padding:32px;">
+    <div class="icon">💬</div>
+    <h3>No sessions yet</h3>
+    <p>Click <strong>+ New Session</strong> to create your first Q&A.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- SUPER ADMIN: ALL SESSIONS -->
+{% if all_sessions %}
+<div class="card">
+  <div class="card-header"><div class="card-title">🔑 All Sessions (Super Admin)</div></div>
+  <div class="card-body" style="padding:0;">
+    <table>
+      <thead><tr><th>Session</th><th>Created By</th><th>Code</th><th>Qs</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        {% for s in all_sessions %}
+        <tr>
+          <td class="fw-bold">{{ s.title }}</td>
+          <td class="fs-sm text-slate">{{ s.first_name }} {{ s.last_name }}</td>
+          <td><span style="font-family:monospace;font-weight:700;color:var(--navy);letter-spacing:2px;">{{ s.join_code }}</span></td>
+          <td>{{ s.q_count }}</td>
+          <td><span class="badge badge-{% if s.status=='active' %}active{% else %}inactive{% endif %}">{{ s.status }}</span></td>
+          <td>
+            <a href="{{ url_for('qa_manage', session_id=s.id) }}" class="btn btn-xs btn-outline">Manage</a>
+            <a href="{{ url_for('qa_present', code=s.join_code) }}" class="btn btn-xs btn-gold" target="_blank">Present</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+
+<!-- CREATE SESSION MODAL -->
+<div class="modal-overlay" id="createSessionModal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <div class="modal-title">💬 Create Q&A Session</div>
+      <button class="modal-close" onclick="closeModal('createSessionModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('qa_create') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Session Title *</label>
+          <input type="text" name="title" required placeholder="e.g. Sunday Sermon Q&A, Bible Study Discussion">
+        </div>
+        <div class="form-group">
+          <label>Description (optional)</label>
+          <input type="text" name="description" placeholder="e.g. Ask Pastor John anything about today's sermon">
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:10px;text-transform:none;letter-spacing:0;cursor:pointer;font-weight:normal;">
+            <input type="checkbox" name="moderation" style="width:15px;height:15px;">
+            <div>
+              <div class="fw-bold" style="font-size:0.875rem;">🛡️ Enable moderation</div>
+              <div class="fs-sm text-slate">Questions must be approved before appearing publicly</div>
+            </div>
+          </label>
+        </div>
+        <div style="background:var(--ivory2);border-radius:8px;padding:12px 14px;font-size:0.82rem;color:var(--slate);">
+          💡 A unique 6-character join code will be generated automatically. Share it with your audience so they can join from their phones.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('createSessionModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Create Session</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function copyCode(code) {
+  const url = window.location.origin + '/qa/' + code;
+  navigator.clipboard.writeText(url).then(() => {
+    showToast('Link copied: ' + url);
+  });
+}
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a2744;color:#fff;padding:10px 20px;border-radius:8px;font-size:0.85rem;z-index:9999;';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+</script>
+{% endblock %}

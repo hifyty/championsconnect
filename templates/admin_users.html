@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block title %}Users & Roles{% endblock %}
+{% block page_title %}👑 Users & Role Management{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">All Users</div>
+    <span class="fs-sm text-slate">{{ users|length }} accounts</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Email</th>
+          <th>Member Profile</th>
+          <th>Current Role</th>
+          <th>Change Role</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr {% if u.id == session.get('user_id') %}style="background:#fffbeb;"{% endif %}>
+          <td>
+            <div class="fw-bold">{{ u.first_name or '—' }} {{ u.last_name or '' }}</div>
+            <div class="fs-sm text-slate">Joined {{ u.created_at[:10] if u.created_at else '—' }}</div>
+          </td>
+          <td class="fs-sm">{{ u.email }}</td>
+          <td>
+            {% if u.first_name %}
+            <span class="badge badge-active">Linked ✅</span>
+            {% if u.is_choir_member %}<span class="badge" style="background:#eff6ff;color:#1e40af;margin-left:4px;">🎵 Choir</span>{% endif %}
+            {% else %}
+            <span class="badge badge-inactive">Not linked</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="badge {% if u.role == 'super_admin' %}badge-active{% elif 'admin' in (u.role or '') %}badge-scheduled{% else %}badge-inactive{% endif %}"
+                  style="font-size:0.78rem;">
+              {{ {'super_admin':'👑 Super Admin','finance_admin':'💰 Finance Admin','choir_admin':'🎵 Choir Admin',
+                  'content_admin':'📰 Content Admin','events_admin':'📅 Events Admin','member':'👤 Member'}.get(u.role, u.role or 'member') }}
+            </span>
+          </td>
+          <td>
+            {% if u.id != session.get('user_id') %}
+            <form method="POST" action="{{ url_for('set_user_role', user_id=u.id) }}" style="display:flex;gap:6px;">
+              <select name="role" style="padding:5px 8px;border:1.5px solid var(--ivory2);border-radius:6px;font-size:0.8rem;">
+                {% for role in all_roles %}
+                <option value="{{ role }}" {% if u.role == role %}selected{% endif %}>
+                  {{ {'super_admin':'👑 Super Admin','finance_admin':'💰 Finance Admin',
+                      'choir_admin':'🎵 Choir Admin','content_admin':'📰 Content Admin',
+                      'events_admin':'📅 Events Admin','member':'👤 Member'}.get(role, role) }}
+                </option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-xs btn-gold">Set</button>
+            </form>
+            {% else %}
+            <span class="fs-sm text-slate">That's you</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.id != session.get('user_id') %}
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="btn btn-xs btn-outline"
+                onclick="openResetModal({{ u.id }}, '{{ u.first_name or u.email }}')">
+                🔑 Reset PW
+              </button>
+              <form method="POST" action="{{ url_for('delete_user', user_id=u.id) }}"
+                    onsubmit="return confirm('Delete {{ u.first_name or u.email }}? This cannot be undone.');">
+                <button type="submit" class="btn btn-xs btn-danger">Delete</button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Role reference card -->
+<div class="card mt-2">
+  <div class="card-header"><div class="card-title">📖 Role Reference</div></div>
+  <div class="card-body" style="padding:0;">
+    <table>
+      <thead><tr><th>Role</th><th>Can Access</th><th>Restricted From</th></tr></thead>
+      <tbody>
+        {% for role, access, restricted in [
+          ('👑 Super Admin',    'Everything — full God mode',         'Nothing'),
+          ('💰 Finance Admin',  'Donations, expenses, QB sync, email, SMS', 'Choir management, content admin'),
+          ('🎵 Choir Admin',    'Choir roster, attendance, songs, duty roster', 'Finance records, user management'),
+          ('📰 Content Admin',  'News & blog posts, prayer verses, scripture', 'Finance, choir admin'),
+          ('📅 Events Admin',   'Events creation and management',      'Finance, choir, content'),
+          ('👤 Member',         'My portal, my giving, choir schedule (if choir member), news read/comment/like', 'All admin features'),
+        ] %}
+        <tr>
+          <td class="fw-bold fs-sm">{{ role }}</td>
+          <td class="fs-sm text-slate">{{ access }}</td>
+          <td class="fs-sm" style="color:var(--danger);">{{ restricted }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- RESET PASSWORD MODAL -->
+<div class="modal-overlay" id="resetPwModal">
+  <div class="modal" style="max-width:420px;">
+    <div class="modal-header">
+      <div class="modal-title">🔑 Reset Password</div>
+      <button class="modal-close" onclick="closeModal('resetPwModal')">✕</button>
+    </div>
+    <form id="resetPwForm" method="POST">
+      <div class="modal-body">
+        <p class="fs-sm text-slate" style="margin-bottom:12px;">
+          Resetting password for: <strong id="resetUserName"></strong>
+        </p>
+        <div class="form-group">
+          <label>New Password *</label>
+          <input type="password" name="new_password" required minlength="6" placeholder="Minimum 6 characters">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('resetPwModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Reset Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openResetModal(userId, name) {
+  document.getElementById('resetPwForm').action = '/admin/users/' + userId + '/reset-password';
+  document.getElementById('resetUserName').textContent = name;
+  openModal('resetPwModal');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,246 @@
+{% extends 'base.html' %}
+{% block title %}Events{% endblock %}
+{% block page_title %}Events{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-gold" onclick="openModal('addEventModal')">+ Add Event</button>
+{% endblock %}
+
+{% block content %}
+
+<div class="tabs">
+  <button class="tab-btn active" data-group="ev" data-tab="evUpcoming" onclick="switchTab('evUpcoming','ev')">📅 Upcoming ({{ upcoming|length }})</button>
+  <button class="tab-btn" data-group="ev" data-tab="evPast" onclick="switchTab('evPast','ev')">🕐 Past Events</button>
+</div>
+
+<!-- UPCOMING -->
+<div class="tab-panel active" id="evUpcoming" data-group="ev">
+  {% if upcoming %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:18px;">
+    {% for ev in upcoming %}
+    <div class="card" style="overflow:hidden;">
+
+      <!-- Flyer / GIF image if uploaded -->
+      {% if ev.flyer_filename %}
+      {% set ext = ev.flyer_filename.rsplit('.',1)[1].lower() if '.' in ev.flyer_filename else '' %}
+      {% if ext in ['jpg','jpeg','png','gif','webp'] %}
+      <div style="position:relative;overflow:hidden;max-height:200px;background:#000;">
+        <img src="{{ url_for('static', filename='uploads/events/' + ev.flyer_filename) }}"
+             alt="{{ ev.title }} flyer"
+             style="width:100%;object-fit:cover;display:block;{% if ext == 'gif' %}image-rendering:auto;{% endif %}">
+        <div style="position:absolute;top:8px;right:8px;">
+          <span class="badge" style="background:rgba(0,0,0,.6);color:#fff;font-size:0.7rem;">
+            {% if ext == 'gif' %}🎬 GIF{% else %}🖼️ Flyer{% endif %}
+          </span>
+        </div>
+      </div>
+      {% elif ext == 'pdf' %}
+      <div style="background:var(--ivory2);padding:14px 18px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--ivory2);">
+        <span style="font-size:1.5rem;">📄</span>
+        <div>
+          <div style="font-size:0.82rem;font-weight:700;">Program PDF attached</div>
+          <a href="{{ url_for('static', filename='uploads/events/' + ev.flyer_filename) }}"
+             target="_blank" class="btn btn-xs btn-outline" style="margin-top:4px;">View PDF</a>
+        </div>
+      </div>
+      {% endif %}
+      {% endif %}
+
+      <!-- Navy header -->
+      <div style="background:var(--navy);padding:16px 20px;">
+        <div style="color:var(--gold);font-size:0.7rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:5px;">
+          {{ ev.event_type or 'Event' }}
+        </div>
+        <h3 style="color:#fff;font-size:1rem;line-height:1.3;">{{ ev.title }}</h3>
+      </div>
+
+      <!-- Card body -->
+      <div class="card-body">
+        <div style="display:flex;flex-direction:column;gap:7px;font-size:0.875rem;">
+          <div style="display:flex;gap:10px;align-items:center;">
+            <span>📅</span> <strong>{{ ev.event_date }}</strong>
+            {% if ev.start_time %} at {{ ev.start_time }}{% if ev.end_time %} – {{ ev.end_time }}{% endif %}{% endif %}
+          </div>
+          {% if ev.location %}
+          <div style="display:flex;gap:10px;align-items:flex-start;">
+            <span>📍</span> {{ ev.location }}
+          </div>
+          {% endif %}
+          {% if ev.description %}
+          <div style="color:var(--slate);font-size:0.83rem;margin-top:2px;">{{ ev.description }}</div>
+          {% endif %}
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <span class="badge badge-{{ ev.status }}">{{ ev.status }}</span>
+          <a href="{{ url_for('event_detail', event_id=ev.id) }}" class="btn btn-xs btn-outline">View</a>
+          {% if ev.flyer_filename %}
+          {% set ext2 = ev.flyer_filename.rsplit('.',1)[1].lower() if '.' in ev.flyer_filename else '' %}
+          {% if ext2 in ['jpg','jpeg','png','gif','webp','pdf'] %}
+          <a href="{{ url_for('static', filename='uploads/events/' + ev.flyer_filename) }}"
+             download class="btn btn-xs btn-outline">⬇ Flyer</a>
+          {% endif %}
+          {% endif %}
+          {% if session.get('role') in ['admin','finance'] %}
+          <form method="POST" action="{{ url_for('delete_event', event_id=ev.id) }}"
+                style="margin-left:auto;" onsubmit="return confirm('Delete this event?');">
+            <button type="submit" class="btn btn-xs btn-danger">Delete</button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <div class="icon">📅</div>
+    <h3>No upcoming events</h3>
+    <p>Click <strong>+ Add Event</strong> to schedule one.</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- PAST -->
+<div class="tab-panel" id="evPast" data-group="ev">
+  {% if past %}
+  <div class="card">
+    <div class="card-body" style="padding:0;">
+      <table>
+        <thead>
+          <tr><th>Title</th><th>Type</th><th>Date</th><th>Location</th><th>Flyer</th></tr>
+        </thead>
+        <tbody>
+          {% for ev in past %}
+          <tr>
+            <td><a href="{{ url_for('event_detail', event_id=ev.id) }}" class="fw-bold" style="color:var(--navy);">{{ ev.title }}</a></td>
+            <td class="fs-sm text-slate">{{ ev.event_type or '—' }}</td>
+            <td class="fs-sm">{{ ev.event_date }}</td>
+            <td class="fs-sm">{{ ev.location or '—' }}</td>
+            <td>
+              {% if ev.flyer_filename %}
+              <a href="{{ url_for('static', filename='uploads/events/' + ev.flyer_filename) }}"
+                 target="_blank" class="btn btn-xs btn-outline">View</a>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="empty-state"><p>No past events recorded.</p></div>
+  {% endif %}
+</div>
+
+
+<!-- ADD EVENT MODAL -->
+<div class="modal-overlay" id="addEventModal">
+  <div class="modal" style="max-width:580px;">
+    <div class="modal-header">
+      <div class="modal-title">📅 Add Event</div>
+      <button class="modal-close" onclick="closeModal('addEventModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_event') }}" enctype="multipart/form-data">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Event Title *</label>
+          <input type="text" name="title" placeholder="e.g. Christmas Concert" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Event Type</label>
+            <select name="event_type">
+              {% for et in ['Concert','Sunday Service','Midweek Service','Workshop','Social','Fundraiser','Special Event'] %}
+              <option value="{{ et }}">{{ et }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Date *</label>
+            <input type="date" name="event_date" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Start Time</label>
+            <input type="time" name="start_time">
+          </div>
+          <div class="form-group">
+            <label>End Time</label>
+            <input type="time" name="end_time">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Location</label>
+          <input type="text" name="location" placeholder="e.g. Church Hall, Main Sanctuary">
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" rows="2" placeholder="Details about the event..."></textarea>
+        </div>
+
+        <!-- FLYER UPLOAD -->
+        <div class="form-group">
+          <label>Flyer / GIF / Program (optional)</label>
+          <div id="dropZone" style="border:2px dashed var(--ivory2);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:border-color .2s;"
+               onclick="document.getElementById('flyerInput').click()"
+               ondragover="event.preventDefault();this.style.borderColor='var(--gold)'"
+               ondragleave="this.style.borderColor='var(--ivory2)'"
+               ondrop="handleDrop(event)">
+            <div id="dropText" style="color:var(--slate);font-size:0.875rem;">
+              <div style="font-size:2rem;margin-bottom:6px;">🖼️</div>
+              <strong>Click or drag & drop</strong><br>
+              <span style="font-size:0.78rem;">JPG, PNG, GIF, WEBP, PDF — max 10MB</span>
+            </div>
+            <div id="dropPreview" style="display:none;">
+              <img id="previewImg" style="max-height:120px;max-width:100%;border-radius:6px;" src="">
+              <div id="previewName" style="font-size:0.8rem;color:var(--slate);margin-top:6px;"></div>
+            </div>
+          </div>
+          <input type="file" id="flyerInput" name="flyer"
+                 accept=".jpg,.jpeg,.png,.gif,.webp,.pdf"
+                 style="display:none;" onchange="previewFile(this)">
+        </div>
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addEventModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Create Event</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function previewFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('dropText').style.display = 'none';
+  document.getElementById('dropPreview').style.display = 'block';
+  document.getElementById('previewName').textContent = file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)';
+  if (file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = e => { document.getElementById('previewImg').src = e.target.result; document.getElementById('previewImg').style.display='block'; };
+    reader.readAsDataURL(file);
+  } else {
+    document.getElementById('previewImg').style.display = 'none';
+  }
+  document.getElementById('dropZone').style.borderColor = 'var(--gold)';
+}
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').style.borderColor = 'var(--ivory2)';
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('flyerInput').files = dt.files;
+    previewFile(document.getElementById('flyerInput'));
+  }
+}
+</script>
+{% endblock %}
