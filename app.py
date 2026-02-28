@@ -520,6 +520,83 @@ def init_db():
     db.execute("UPDATE users SET role='super_admin' WHERE role='admin'")
     db.execute("UPDATE users SET role='finance_admin' WHERE role='finance'")
 
+    # House Fellowship tables
+    db.executescript("""
+        CREATE TABLE IF NOT EXISTS house_fellowships (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            location TEXT,
+            meeting_day TEXT,
+            meeting_time TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS fellowship_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fellowship_id INTEGER NOT NULL REFERENCES house_fellowships(id) ON DELETE CASCADE,
+            member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            role TEXT DEFAULT 'member',
+            joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(member_id)
+        );
+        CREATE TABLE IF NOT EXISTS fellowship_announcements (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fellowship_id INTEGER NOT NULL REFERENCES house_fellowships(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS fellowship_prayer_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fellowship_id INTEGER NOT NULL REFERENCES house_fellowships(id) ON DELETE CASCADE,
+            request_text TEXT NOT NULL,
+            submitted_by INTEGER REFERENCES users(id),
+            submitter_name TEXT,
+            is_answered INTEGER DEFAULT 0,
+            is_private INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS fellowship_attendance_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fellowship_id INTEGER NOT NULL REFERENCES house_fellowships(id) ON DELETE CASCADE,
+            session_date TEXT NOT NULL,
+            session_type TEXT DEFAULT 'Regular Meeting',
+            notes TEXT,
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS fellowship_attendance_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER NOT NULL REFERENCES fellowship_attendance_sessions(id) ON DELETE CASCADE,
+            member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            status TEXT DEFAULT 'present',
+            UNIQUE(session_id, member_id)
+        );
+        CREATE TABLE IF NOT EXISTS fellowship_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            fellowship_id INTEGER NOT NULL REFERENCES house_fellowships(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            event_date TEXT NOT NULL,
+            start_time TEXT,
+            location TEXT,
+            description TEXT,
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    # Seed 3 house fellowships
+    if db.execute("SELECT COUNT(*) FROM house_fellowships").fetchone()[0] == 0:
+        for name in [
+            'Champions Westerners House Fellowship',
+            'Champions Northside House Fellowship',
+            'Champions Southside House Fellowship',
+        ]:
+            db.execute("INSERT INTO house_fellowships (name) VALUES (?)", (name,))
+
     # Q&A tables
     db.executescript("""
         CREATE TABLE IF NOT EXISTS qa_sessions (
@@ -647,7 +724,17 @@ def is_choir_admin():    return session.get('role') in ('super_admin','admin','c
 def is_content_admin():  return session.get('role') in ('super_admin','admin','content_admin')
 def is_events_admin():   return session.get('role') in ('super_admin','admin','events_admin')
 
-def login_required(f):
+def is_fellowship_admin():
+    return session.get('role') in ('super_admin', 'admin', 'fellowship_leader')
+
+def get_user_fellowship(user_id):
+    """Return the fellowship where this user's linked member is a leader or member."""
+    return query_db("""SELECT hf.*, fm.role as fm_role FROM house_fellowships hf
+        JOIN fellowship_members fm ON hf.id=fm.fellowship_id
+        JOIN members m ON fm.member_id=m.id
+        WHERE m.user_id=?""", [user_id], one=True)
+
+
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'user_id' not in session:
@@ -780,22 +867,66 @@ def logout():
 @app.route('/')
 @login_required
 def dashboard():
-    total_members    = query_db("SELECT COUNT(*) as c FROM members WHERE status='active'", one=True)['c']
-    total_donations  = query_db("SELECT COALESCE(SUM(amount),0) as t FROM donations WHERE strftime('%Y-%m',donation_date)=strftime('%Y-%m','now')", one=True)['t']
-    upcoming_duties  = query_db("""SELECT dr.*,m.first_name,m.last_name,m.voice_part FROM duty_roster dr
-        JOIN members m ON dr.member_id=m.id WHERE dr.scheduled_date>=date('now')
-        ORDER BY dr.scheduled_date ASC LIMIT 5""")
-    recent_donations = query_db("""SELECT d.*,m.first_name,m.last_name,fc.name as category_name,fc.color
-        FROM donations d LEFT JOIN members m ON d.member_id=m.id
-        LEFT JOIN finance_categories fc ON d.category_id=fc.id
-        ORDER BY d.donation_date DESC LIMIT 5""")
-    member_breakdown = query_db("SELECT voice_part, COUNT(*) as count FROM members WHERE status='active' GROUP BY voice_part")
-    pinned_news      = query_db("SELECT * FROM news_posts WHERE is_published=1 AND pinned=1 ORDER BY created_at DESC LIMIT 2")
-    daily_verse      = get_daily_verse()
-    return render_template('dashboard.html',
-        total_members=total_members, total_donations=total_donations,
-        upcoming_duties=upcoming_duties, recent_donations=recent_donations,
-        member_breakdown=member_breakdown, pinned_news=pinned_news, daily_verse=daily_verse)
+    daily_verse  = get_daily_verse()
+    pinned_news  = query_db("SELECT * FROM news_posts WHERE is_published=1 AND pinned=1 ORDER BY created_at DESC LIMIT 2")
+
+    if is_super_admin():
+        # ── Super Admin: command-centre view ──
+        total_members   = query_db("SELECT COUNT(*) as c FROM members", one=True)['c']
+        active_members  = query_db("SELECT COUNT(*) as c FROM members WHERE status='active'", one=True)['c']
+        new_this_month  = query_db("""SELECT COUNT(*) as c FROM members
+            WHERE strftime('%Y-%m', created_at)=strftime('%Y-%m','now')""", one=True)['c']
+        total_users     = query_db("SELECT COUNT(*) as c FROM users", one=True)['c']
+        # Pending user approvals: users with no linked member profile & role=member signed up in last 30 days
+        pending_users   = query_db("""SELECT u.id, u.first_name, u.last_name, u.email, u.role, u.created_at
+            FROM users u WHERE u.role='member'
+            ORDER BY u.created_at DESC LIMIT 10""")
+        pending_count   = query_db("""SELECT COUNT(*) as c FROM users
+            WHERE role NOT IN ('super_admin','admin') AND
+            id NOT IN (SELECT DISTINCT user_id FROM members WHERE user_id IS NOT NULL)""", one=True)['c']
+        # Recent activity: last 10 user or member events
+        recent_activity = query_db("""
+            SELECT 'New Member' as activity_type, first_name||' '||last_name as name,
+                   created_at, '' as detail FROM members
+            UNION ALL
+            SELECT 'New User', first_name||' '||last_name, created_at, role FROM users
+            ORDER BY created_at DESC LIMIT 12""")
+        # Role breakdown
+        role_breakdown  = query_db("SELECT role, COUNT(*) as count FROM users GROUP BY role ORDER BY count DESC")
+        # Fellowship summary
+        fellowship_summary = query_db("""SELECT hf.id, hf.name,
+            COUNT(fm.id) as member_count
+            FROM house_fellowships hf
+            LEFT JOIN fellowship_members fm ON hf.id=fm.fellowship_id
+            GROUP BY hf.id ORDER BY hf.name""")
+        total_fellowships = query_db("SELECT COUNT(*) as c FROM house_fellowships", one=True)['c']
+
+        return render_template('dashboard.html',
+            view='super_admin',
+            total_members=total_members, active_members=active_members,
+            new_this_month=new_this_month, total_users=total_users,
+            pending_users=pending_users, pending_count=pending_count,
+            recent_activity=recent_activity, role_breakdown=role_breakdown,
+            fellowship_summary=fellowship_summary, total_fellowships=total_fellowships,
+            daily_verse=daily_verse, pinned_news=pinned_news)
+
+    else:
+        # ── Standard / member dashboard ──
+        total_members    = query_db("SELECT COUNT(*) as c FROM members WHERE status='active'", one=True)['c']
+        total_donations  = query_db("SELECT COALESCE(SUM(amount),0) as t FROM donations WHERE strftime('%Y-%m',donation_date)=strftime('%Y-%m','now')", one=True)['t']
+        upcoming_duties  = query_db("""SELECT dr.*,m.first_name,m.last_name,m.voice_part FROM duty_roster dr
+            JOIN members m ON dr.member_id=m.id WHERE dr.scheduled_date>=date('now')
+            ORDER BY dr.scheduled_date ASC LIMIT 5""")
+        recent_donations = query_db("""SELECT d.*,m.first_name,m.last_name,fc.name as category_name,fc.color
+            FROM donations d LEFT JOIN members m ON d.member_id=m.id
+            LEFT JOIN finance_categories fc ON d.category_id=fc.id
+            ORDER BY d.donation_date DESC LIMIT 5""")
+        member_breakdown = query_db("SELECT voice_part, COUNT(*) as count FROM members WHERE status='active' GROUP BY voice_part")
+        return render_template('dashboard.html',
+            view='standard',
+            total_members=total_members, total_donations=total_donations,
+            upcoming_duties=upcoming_duties, recent_donations=recent_donations,
+            member_breakdown=member_breakdown, pinned_news=pinned_news, daily_verse=daily_verse)
 
 
 # ─────────── MEMBERS ───────────
@@ -2682,6 +2813,339 @@ def qa_present(code):
         flash('Session not found.', 'danger')
         return redirect(url_for('qa_join_landing'))
     return render_template('qa_present.html', qa_s=qa_s)
+
+# ─────────────────────────────────────────────
+# HOUSE FELLOWSHIP MODULE
+# ─────────────────────────────────────────────
+
+@app.route('/fellowship')
+@login_required
+def fellowship_index():
+    if is_super_admin():
+        fellowships = query_db("""SELECT hf.*,
+            COUNT(DISTINCT fm.id) as member_count,
+            COUNT(DISTINCT fe.id) as event_count
+            FROM house_fellowships hf
+            LEFT JOIN fellowship_members fm ON hf.id=fm.fellowship_id
+            LEFT JOIN fellowship_events fe ON hf.id=fe.fellowship_id AND fe.event_date>=date('now')
+            GROUP BY hf.id ORDER BY hf.name""")
+        return render_template('fellowship_index.html', fellowships=fellowships, view='super_admin')
+    else:
+        # Member/leader: show only their fellowship
+        my_fellowship = get_user_fellowship(session['user_id'])
+        if not my_fellowship:
+            flash('You are not assigned to a House Fellowship yet.', 'info')
+            return render_template('fellowship_index.html', fellowships=[], view='member')
+        return redirect(url_for('fellowship_detail', fellowship_id=my_fellowship['id']))
+
+
+@app.route('/fellowship/new', methods=['GET', 'POST'])
+@super_admin_required
+def fellowship_new():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        if not name:
+            flash('Fellowship name is required.', 'danger')
+            return render_template('fellowship_form.html', fellowship=None)
+        try:
+            execute_db("""INSERT INTO house_fellowships
+                (name, description, location, meeting_day, meeting_time, created_by)
+                VALUES (?,?,?,?,?,?)""", (
+                name,
+                request.form.get('description', '').strip(),
+                request.form.get('location', '').strip(),
+                request.form.get('meeting_day', ''),
+                request.form.get('meeting_time', ''),
+                session['user_id']))
+            flash(f'"{name}" created successfully! ✅', 'success')
+            return redirect(url_for('fellowship_index'))
+        except Exception:
+            flash('A fellowship with that name already exists.', 'danger')
+    return render_template('fellowship_form.html', fellowship=None)
+
+
+@app.route('/fellowship/<int:fellowship_id>')
+@login_required
+def fellowship_detail(fellowship_id):
+    hf = query_db("SELECT * FROM house_fellowships WHERE id=?", [fellowship_id], one=True)
+    if not hf:
+        flash('Fellowship not found.', 'danger')
+        return redirect(url_for('fellowship_index'))
+    # Access check: super admin sees all; others only their own
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['id'] != fellowship_id:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_index'))
+    members      = query_db("""SELECT fm.*, m.first_name, m.last_name, m.email, m.phone, m.voice_part
+        FROM fellowship_members fm JOIN members m ON fm.member_id=m.id
+        WHERE fm.fellowship_id=? ORDER BY fm.role DESC, m.last_name""", [fellowship_id])
+    announcements = query_db("""SELECT fa.*, u.first_name||' '||u.last_name as author
+        FROM fellowship_announcements fa LEFT JOIN users u ON fa.created_by=u.id
+        WHERE fa.fellowship_id=? ORDER BY fa.created_at DESC LIMIT 5""", [fellowship_id])
+    prayer_requests = query_db("""SELECT fpr.*, u.first_name||' '||u.last_name as author
+        FROM fellowship_prayer_requests fpr LEFT JOIN users u ON fpr.submitted_by=u.id
+        WHERE fpr.fellowship_id=? AND fpr.is_answered=0 ORDER BY fpr.created_at DESC""", [fellowship_id])
+    upcoming_events = query_db("""SELECT * FROM fellowship_events
+        WHERE fellowship_id=? AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5""", [fellowship_id])
+    recent_sessions = query_db("""SELECT fas.*,
+        COUNT(far.id) as total, SUM(CASE WHEN far.status='present' THEN 1 ELSE 0 END) as present_count
+        FROM fellowship_attendance_sessions fas
+        LEFT JOIN fellowship_attendance_records far ON fas.id=far.session_id
+        WHERE fas.fellowship_id=? GROUP BY fas.id ORDER BY fas.session_date DESC LIMIT 5""", [fellowship_id])
+    # Check if current user is leader of this fellowship
+    my_role = None
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if my:
+            my_role = my['fm_role']
+    return render_template('fellowship_detail.html',
+        hf=hf, members=members, announcements=announcements,
+        prayer_requests=prayer_requests, upcoming_events=upcoming_events,
+        recent_sessions=recent_sessions, my_role=my_role)
+
+
+@app.route('/fellowship/<int:fellowship_id>/edit', methods=['GET', 'POST'])
+@super_admin_required
+def fellowship_edit(fellowship_id):
+    hf = query_db("SELECT * FROM house_fellowships WHERE id=?", [fellowship_id], one=True)
+    if not hf:
+        flash('Not found.', 'danger')
+        return redirect(url_for('fellowship_index'))
+    if request.method == 'POST':
+        execute_db("""UPDATE house_fellowships SET name=?, description=?, location=?,
+            meeting_day=?, meeting_time=?, is_active=? WHERE id=?""", (
+            request.form.get('name'), request.form.get('description'),
+            request.form.get('location'), request.form.get('meeting_day'),
+            request.form.get('meeting_time'),
+            1 if request.form.get('is_active') else 0, fellowship_id))
+        flash('Fellowship updated!', 'success')
+        return redirect(url_for('fellowship_detail', fellowship_id=fellowship_id))
+    return render_template('fellowship_form.html', fellowship=hf)
+
+
+@app.route('/fellowship/<int:fellowship_id>/members/add', methods=['POST'])
+@login_required
+def fellowship_add_member(fellowship_id):
+    hf = query_db("SELECT * FROM house_fellowships WHERE id=?", [fellowship_id], one=True)
+    if not hf:
+        flash('Fellowship not found.', 'danger')
+        return redirect(url_for('fellowship_index'))
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['id'] != fellowship_id or my['fm_role'] != 'leader':
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_detail', fellowship_id=fellowship_id))
+    member_id = request.form.get('member_id')
+    role      = request.form.get('role', 'member')
+    try:
+        execute_db("INSERT INTO fellowship_members (fellowship_id, member_id, role) VALUES (?,?,?)",
+            (fellowship_id, member_id, role))
+        flash('Member added to fellowship! ✅', 'success')
+    except Exception:
+        flash('This member is already assigned to a fellowship.', 'warning')
+    return redirect(url_for('fellowship_detail', fellowship_id=fellowship_id))
+
+
+@app.route('/fellowship/<int:fellowship_id>/members/<int:fm_id>/remove', methods=['POST'])
+@login_required
+def fellowship_remove_member(fellowship_id, fm_id):
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['id'] != fellowship_id or my['fm_role'] != 'leader':
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_detail', fellowship_id=fellowship_id))
+    execute_db("DELETE FROM fellowship_members WHERE id=? AND fellowship_id=?", [fm_id, fellowship_id])
+    flash('Member removed from fellowship.', 'info')
+    return redirect(url_for('fellowship_detail', fellowship_id=fellowship_id))
+
+
+@app.route('/fellowship/<int:fellowship_id>/members/<int:fm_id>/role', methods=['POST'])
+@login_required
+def fellowship_change_role(fellowship_id, fm_id):
+    if not is_super_admin():
+        flash('Access denied.', 'danger')
+        return redirect(url_for('fellowship_detail', fellowship_id=fellowship_id))
+    new_role = request.form.get('role', 'member')
+    execute_db("UPDATE fellowship_members SET role=? WHERE id=? AND fellowship_id=?",
+        [new_role, fm_id, fellowship_id])
+    flash('Role updated!', 'success')
+    return redirect(url_for('fellowship_detail', fellowship_id=fellowship_id))
+
+
+# ── Announcements ──
+
+@app.route('/fellowship/<int:fellowship_id>/announcements', methods=['GET', 'POST'])
+@login_required
+def fellowship_announcements(fellowship_id):
+    hf = query_db("SELECT * FROM house_fellowships WHERE id=?", [fellowship_id], one=True)
+    if not hf:
+        flash('Not found.', 'danger')
+        return redirect(url_for('fellowship_index'))
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['id'] != fellowship_id:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_index'))
+    if request.method == 'POST':
+        title = request.form.get('title', '').strip()
+        body  = request.form.get('body', '').strip()
+        if title and body:
+            execute_db("""INSERT INTO fellowship_announcements
+                (fellowship_id, title, body, created_by) VALUES (?,?,?,?)""",
+                (fellowship_id, title, body, session['user_id']))
+            flash('Announcement posted! ✅', 'success')
+        else:
+            flash('Title and body are required.', 'danger')
+        return redirect(url_for('fellowship_announcements', fellowship_id=fellowship_id))
+    announcements = query_db("""SELECT fa.*, u.first_name||' '||u.last_name as author
+        FROM fellowship_announcements fa LEFT JOIN users u ON fa.created_by=u.id
+        WHERE fa.fellowship_id=? ORDER BY fa.created_at DESC""", [fellowship_id])
+    return render_template('fellowship_announcements.html', hf=hf, announcements=announcements)
+
+
+@app.route('/fellowship/<int:fellowship_id>/announcements/<int:ann_id>/delete', methods=['POST'])
+@login_required
+def fellowship_delete_announcement(fellowship_id, ann_id):
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['id'] != fellowship_id or my['fm_role'] != 'leader':
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_announcements', fellowship_id=fellowship_id))
+    execute_db("DELETE FROM fellowship_announcements WHERE id=? AND fellowship_id=?", [ann_id, fellowship_id])
+    flash('Announcement deleted.', 'info')
+    return redirect(url_for('fellowship_announcements', fellowship_id=fellowship_id))
+
+
+# ── Prayer Requests ──
+
+@app.route('/fellowship/<int:fellowship_id>/prayer', methods=['GET', 'POST'])
+@login_required
+def fellowship_prayer(fellowship_id):
+    hf = query_db("SELECT * FROM house_fellowships WHERE id=?", [fellowship_id], one=True)
+    if not hf:
+        flash('Not found.', 'danger')
+        return redirect(url_for('fellowship_index'))
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['id'] != fellowship_id:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_index'))
+    if request.method == 'POST':
+        text = request.form.get('request_text', '').strip()
+        name = request.form.get('submitter_name', '').strip() or session.get('name', 'Anonymous')
+        if text:
+            execute_db("""INSERT INTO fellowship_prayer_requests
+                (fellowship_id, request_text, submitted_by, submitter_name, is_private)
+                VALUES (?,?,?,?,?)""",
+                (fellowship_id, text, session['user_id'], name,
+                 1 if request.form.get('is_private') else 0))
+            flash('Prayer request submitted. 🙏', 'success')
+        return redirect(url_for('fellowship_prayer', fellowship_id=fellowship_id))
+    active   = query_db("""SELECT fpr.*, u.first_name||' '||u.last_name as author
+        FROM fellowship_prayer_requests fpr LEFT JOIN users u ON fpr.submitted_by=u.id
+        WHERE fpr.fellowship_id=? AND fpr.is_answered=0 ORDER BY fpr.created_at DESC""", [fellowship_id])
+    answered = query_db("""SELECT fpr.*, u.first_name||' '||u.last_name as author
+        FROM fellowship_prayer_requests fpr LEFT JOIN users u ON fpr.submitted_by=u.id
+        WHERE fpr.fellowship_id=? AND fpr.is_answered=1 ORDER BY fpr.created_at DESC LIMIT 10""", [fellowship_id])
+    return render_template('fellowship_prayer.html', hf=hf, active=active, answered=answered)
+
+
+@app.route('/fellowship/<int:fellowship_id>/prayer/<int:pr_id>/answered', methods=['POST'])
+@login_required
+def fellowship_prayer_answered(fellowship_id, pr_id):
+    execute_db("UPDATE fellowship_prayer_requests SET is_answered=1 WHERE id=? AND fellowship_id=?",
+        [pr_id, fellowship_id])
+    flash('Marked as answered! 🙌 Praise God!', 'success')
+    return redirect(url_for('fellowship_prayer', fellowship_id=fellowship_id))
+
+
+# ── Attendance ──
+
+@app.route('/fellowship/<int:fellowship_id>/attendance')
+@login_required
+def fellowship_attendance(fellowship_id):
+    hf = query_db("SELECT * FROM house_fellowships WHERE id=?", [fellowship_id], one=True)
+    if not hf:
+        flash('Not found.', 'danger')
+        return redirect(url_for('fellowship_index'))
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['id'] != fellowship_id:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_index'))
+    sessions = query_db("""SELECT fas.*,
+        COUNT(far.id) as total,
+        SUM(CASE WHEN far.status='present' THEN 1 ELSE 0 END) as present_count
+        FROM fellowship_attendance_sessions fas
+        LEFT JOIN fellowship_attendance_records far ON fas.id=far.session_id
+        WHERE fas.fellowship_id=? GROUP BY fas.id ORDER BY fas.session_date DESC""", [fellowship_id])
+    members = query_db("""SELECT fm.*, m.first_name, m.last_name FROM fellowship_members fm
+        JOIN members m ON fm.member_id=m.id WHERE fm.fellowship_id=? ORDER BY m.last_name""", [fellowship_id])
+    return render_template('fellowship_attendance.html', hf=hf, sessions=sessions, members=members)
+
+
+@app.route('/fellowship/<int:fellowship_id>/attendance/new', methods=['POST'])
+@login_required
+def fellowship_attendance_new(fellowship_id):
+    session_date = request.form.get('session_date', date.today().isoformat())
+    session_type = request.form.get('session_type', 'Regular Meeting')
+    notes        = request.form.get('notes', '')
+    cur = execute_db("""INSERT INTO fellowship_attendance_sessions
+        (fellowship_id, session_date, session_type, notes, created_by) VALUES (?,?,?,?,?)""",
+        (fellowship_id, session_date, session_type, notes, session['user_id']))
+    sess_id = cur.lastrowid
+    # Record statuses for each member
+    members = query_db("SELECT member_id FROM fellowship_members WHERE fellowship_id=?", [fellowship_id])
+    for m in members:
+        status = request.form.get(f"status_{m['member_id']}", 'absent')
+        execute_db("INSERT OR IGNORE INTO fellowship_attendance_records (session_id, member_id, status) VALUES (?,?,?)",
+            (sess_id, m['member_id'], status))
+    flash('Attendance recorded! ✅', 'success')
+    return redirect(url_for('fellowship_attendance', fellowship_id=fellowship_id))
+
+
+# ── Events ──
+
+@app.route('/fellowship/<int:fellowship_id>/events', methods=['GET', 'POST'])
+@login_required
+def fellowship_events(fellowship_id):
+    hf = query_db("SELECT * FROM house_fellowships WHERE id=?", [fellowship_id], one=True)
+    if not hf:
+        flash('Not found.', 'danger')
+        return redirect(url_for('fellowship_index'))
+    if not is_super_admin():
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['id'] != fellowship_id:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_index'))
+    if request.method == 'POST':
+        execute_db("""INSERT INTO fellowship_events
+            (fellowship_id, title, event_date, start_time, location, description, created_by)
+            VALUES (?,?,?,?,?,?,?)""", (
+            fellowship_id,
+            request.form.get('title'),
+            request.form.get('event_date'),
+            request.form.get('start_time', ''),
+            request.form.get('location', ''),
+            request.form.get('description', ''),
+            session['user_id']))
+        flash('Event added! ✅', 'success')
+        return redirect(url_for('fellowship_events', fellowship_id=fellowship_id))
+    upcoming = query_db("""SELECT * FROM fellowship_events WHERE fellowship_id=? AND event_date>=date('now')
+        ORDER BY event_date ASC""", [fellowship_id])
+    past = query_db("""SELECT * FROM fellowship_events WHERE fellowship_id=? AND event_date<date('now')
+        ORDER BY event_date DESC LIMIT 10""", [fellowship_id])
+    return render_template('fellowship_events.html', hf=hf, upcoming=upcoming, past=past)
+
+
+@app.route('/fellowship/<int:fellowship_id>/events/<int:event_id>/delete', methods=['POST'])
+@login_required
+def fellowship_delete_event(fellowship_id, event_id):
+    execute_db("DELETE FROM fellowship_events WHERE id=? AND fellowship_id=?", [event_id, fellowship_id])
+    flash('Event removed.', 'info')
+    return redirect(url_for('fellowship_events', fellowship_id=fellowship_id))
+
 
 # ─────────── MAIN ───────────
 
