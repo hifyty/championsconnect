@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}{{ hf.name }} — Prayer{% endblock %}
+{% block page_title %}🙏 {{ hf.name }} — Prayer Requests{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('fellowship_detail', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">← Back</a>
+{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Submit Prayer Request</div></div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Your Name</label>
+          <input type="text" name="submitter_name" class="form-control" value="{{ session.get('name','') }}" placeholder="Your name (or leave blank for Anonymous)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Prayer Request *</label>
+          <textarea name="request_text" class="form-control" rows="4" required placeholder="Share your prayer request with the fellowship..."></textarea>
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" name="is_private"> Keep this private (only leaders can see)
+          </label>
+        </div>
+        <button type="submit" class="btn btn-primary">🙏 Submit Request</button>
+      </form>
+    </div>
+  </div>
+  <div>
+    <div class="card mb-2">
+      <div class="card-header"><div class="card-title">🙏 Active Requests ({{ active|length }})</div></div>
+      <div class="card-body" style="padding:0;">
+        {% if active %}
+        {% for p in active %}
+        <div style="padding:14px 18px;border-bottom:1px solid var(--border);">
+          <div style="font-size:0.88rem;line-height:1.6;">{{ p.request_text }}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+            <div class="fs-sm text-slate">— {{ p.submitter_name or 'Anonymous' }} · {{ p.created_at[:10] }}</div>
+            {% if session.get('role') in ['super_admin','admin'] or my_role == 'leader' %}
+            <form method="POST" action="{{ url_for('fellowship_prayer_answered', fellowship_id=hf.id, pr_id=p.id) }}">
+              <button type="submit" class="btn btn-sm" style="background:#dcfce7;color:#16a34a;">✅ Answered</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        {% else %}
+        <div class="empty-state"><div class="icon">🙏</div><p>No active prayer requests</p></div>
+        {% endif %}
+      </div>
+    </div>
+    {% if answered %}
+    <div class="card">
+      <div class="card-header"><div class="card-title">🙌 Answered Prayers ({{ answered|length }})</div></div>
+      <div class="card-body" style="padding:0;">
+        {% for p in answered %}
+        <div style="padding:12px 18px;border-bottom:1px solid var(--border);opacity:0.7;">
+          <div class="fs-sm">{{ p.request_text[:100] }}{% if p.request_text|length > 100 %}…{% endif %}</div>
+          <div class="fs-sm text-slate" style="margin-top:4px;">— {{ p.submitter_name or 'Anonymous' }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

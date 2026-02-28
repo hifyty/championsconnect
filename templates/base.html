@@ -9,8 +9,11 @@
 </head>
 <body>
 
+<!-- MOBILE SIDEBAR OVERLAY -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
 <!-- SIDEBAR -->
-<aside class="sidebar">
+<aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
     <div class="logo-icon">✝️</div>
     <h1>Champions<br>Connect</h1>
@@ -47,7 +50,9 @@
     </a>
     {% endif %}
 
-    <!-- CHOIR MODULE -->
+    <!-- CHOIR MODULE — choir members and admins only -->
+    {% set _choir_roles = ['super_admin','admin','choir_admin'] %}
+    {% if session.get('role') in _choir_roles or session.get('is_choir_member') %}
     <div class="nav-section-label">🎵 Choir</div>
     <a href="{{ url_for('choir') }}" class="nav-link {% if request.endpoint=='choir' %}active{% endif %}">
       <span class="nav-icon">🎶</span> <span>Choir Hub</span>
@@ -55,13 +60,14 @@
     <a href="{{ url_for('roster') }}" class="nav-link {% if request.endpoint=='roster' %}active{% endif %}">
       <span class="nav-icon">📋</span> <span>Duty Roster</span>
     </a>
-    {% if session.get('role') in ['super_admin','admin','choir_admin'] %}
+    {% if session.get('role') in _choir_roles %}
     <a href="{{ url_for('attendance') }}" class="nav-link {% if request.endpoint=='attendance' %}active{% endif %}">
       <span class="nav-icon">✅</span> <span>Attendance</span>
     </a>
     <a href="{{ url_for('songs') }}" class="nav-link {% if request.endpoint=='songs' %}active{% endif %}">
       <span class="nav-icon">🎵</span> <span>Song Library</span>
     </a>
+    {% endif %}
     {% endif %}
 
     <!-- FINANCE MODULE -->
@@ -91,6 +97,17 @@
     <div class="nav-section-label">⚙️ Settings</div>
     <a href="{{ url_for('social_settings') }}" class="nav-link {% if request.endpoint=='social_settings' %}active{% endif %}">
       <span class="nav-icon">📱</span> <span>Social Media Feeds</span>
+    </a>
+    {% endif %}
+
+    <!-- HOUSE FELLOWSHIP -->
+    <div class="nav-section-label">🏠 House Fellowship</div>
+    <a href="{{ url_for('fellowship_index') }}" class="nav-link {% if 'fellowship' in request.endpoint %}active{% endif %}">
+      <span class="nav-icon">🏠</span> <span>House Fellowships</span>
+    </a>
+    {% if session.get('role') in ['super_admin','admin'] %}
+    <a href="{{ url_for('fellowship_new') }}" class="nav-link {% if request.endpoint=='fellowship_new' %}active{% endif %}">
+      <span class="nav-icon">➕</span> <span>New Fellowship</span>
     </a>
     {% endif %}
 
@@ -134,9 +151,12 @@
 <!-- MAIN CONTENT -->
 <div class="main-content">
   <header class="topbar">
-    <div>
-      <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
-      <div class="topbar-date">{{ now.strftime('%A, %B %d, %Y') }}</div>
+    <div class="d-flex align-center gap-1">
+      <button class="mobile-menu-btn" onclick="toggleSidebar()" aria-label="Menu">☰</button>
+      <div>
+        <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+        <div class="topbar-date">{{ now.strftime('%A, %B %d, %Y') }}</div>
+      </div>
     </div>
     <div class="d-flex gap-1">
       {% block topbar_actions %}{% endblock %}
@@ -147,6 +167,37 @@
     {% block content %}{% endblock %}
   </main>
 </div>
+
+<!-- BOTTOM NAV (mobile only) -->
+<nav class="bottom-nav">
+  <div class="bottom-nav-inner">
+    <a href="{{ url_for('dashboard') }}" class="bottom-nav-item {% if request.endpoint=='dashboard' %}active{% endif %}">
+      <span class="bn-icon">🏠</span><span>Home</span>
+    </a>
+    <a href="{{ url_for('fellowship_index') }}" class="bottom-nav-item {% if 'fellowship' in request.endpoint %}active{% endif %}">
+      <span class="bn-icon">⛪</span><span>Fellowship</span>
+    </a>
+    <a href="{{ url_for('events') }}" class="bottom-nav-item {% if 'event' in request.endpoint %}active{% endif %}">
+      <span class="bn-icon">📅</span><span>Events</span>
+    </a>
+    <a href="{{ url_for('news') }}" class="bottom-nav-item {% if 'news' in request.endpoint %}active{% endif %}">
+      <span class="bn-icon">📰</span><span>News</span>
+    </a>
+    <a href="{{ url_for('member_portal') }}" class="bottom-nav-item {% if request.endpoint=='member_portal' %}active{% endif %}">
+      <span class="bn-icon">🙋</span><span>Me</span>
+    </a>
+  </div>
+</nav>
+
+<script>
+function toggleSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebarOverlay');
+  sidebar.classList.toggle('open');
+  overlay.classList.toggle('open');
+  document.body.style.overflow = sidebar.classList.contains('open') ? 'hidden' : '';
+}
+</script>
 
 <script>
   // Auto-dismiss flash messages

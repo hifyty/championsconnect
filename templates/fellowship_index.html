@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}House Fellowships{% endblock %}
+{% block page_title %}House Fellowships{% endblock %}
+{% block topbar_actions %}
+  {% if session.get('role') in ['super_admin','admin'] %}
+  <a href="{{ url_for('fellowship_new') }}" class="btn btn-primary">➕ New Fellowship</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+{% if fellowships %}
+<div class="grid-2">
+  {% for f in fellowships %}
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🏠 {{ f.name }}</div>
+      <a href="{{ url_for('fellowship_detail', fellowship_id=f.id) }}" class="btn btn-sm btn-primary">Open</a>
+    </div>
+    <div class="card-body">
+      {% if f.description %}<p class="text-slate fs-sm mb-1">{{ f.description }}</p>{% endif %}
+      <div class="d-flex gap-2" style="flex-wrap:wrap;margin-top:8px;">
+        {% if f.location %}<span class="badge badge-info">📍 {{ f.location }}</span>{% endif %}
+        {% if f.meeting_day %}<span class="badge badge-scheduled">📅 {{ f.meeting_day }}</span>{% endif %}
+        {% if f.meeting_time %}<span class="badge badge-scheduled">⏰ {{ f.meeting_time }}</span>{% endif %}
+        <span class="badge badge-success">👥 {{ f.member_count }} members</span>
+        <span class="badge badge-info">📅 {{ f.event_count }} upcoming events</span>
+      </div>
+      {% if session.get('role') in ['super_admin','admin'] %}
+      <div style="margin-top:12px;">
+        <a href="{{ url_for('fellowship_edit', fellowship_id=f.id) }}" class="btn btn-sm btn-outline">✏️ Edit</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="icon">🏠</div>
+  <p>No house fellowships yet.</p>
+  {% if session.get('role') in ['super_admin','admin'] %}
+  <a href="{{ url_for('fellowship_new') }}" class="btn btn-primary mt-1">Create First Fellowship</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

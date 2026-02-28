@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% block title %}{{ hf.name }} — Events{% endblock %}
+{% block page_title %}📅 {{ hf.name }} — Events{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('fellowship_detail', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">← Back</a>
+  <button class="btn btn-primary" onclick="openModal('newEventModal')">➕ Add Event</button>
+{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">📅 Upcoming Events</div></div>
+    <div class="card-body" style="padding:0;">
+      {% if upcoming %}
+      {% for e in upcoming %}
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div>
+            <div style="font-weight:600;">{{ e.title }}</div>
+            <div class="fs-sm text-slate">{{ e.event_date }}{% if e.start_time %} at {{ e.start_time }}{% endif %}</div>
+            {% if e.location %}<div class="fs-sm text-slate">📍 {{ e.location }}</div>{% endif %}
+            {% if e.description %}<div class="fs-sm" style="margin-top:4px;">{{ e.description }}</div>{% endif %}
+          </div>
+          <form method="POST" action="{{ url_for('fellowship_delete_event', fellowship_id=hf.id, event_id=e.id) }}" onsubmit="return confirm('Delete this event?')">
+            <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#dc2626;">✕</button>
+          </form>
+        </div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><div class="icon">📅</div><p>No upcoming events</p></div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">🗓 Past Events</div></div>
+    <div class="card-body" style="padding:0;">
+      {% if past %}
+      {% for e in past %}
+      <div style="padding:12px 18px;border-bottom:1px solid var(--border);opacity:0.75;">
+        <div style="font-weight:600;font-size:0.88rem;">{{ e.title }}</div>
+        <div class="fs-sm text-slate">{{ e.event_date }}{% if e.location %} · {{ e.location }}{% endif %}</div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><div class="icon">🗓</div><p>No past events</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="newEventModal">
+  <div class="modal" style="max-width:480px;">
+    <div class="modal-header">
+      <div class="modal-title">Add Fellowship Event</div>
+      <button onclick="closeModal('newEventModal')" class="modal-close">✕</button>
+    </div>
+    <form method="POST">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Event Title *</label>
+          <input type="text" name="title" class="form-control" required placeholder="e.g. Monthly Fellowship Dinner">
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Date *</label>
+            <input type="date" name="event_date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Time</label>
+            <input type="time" name="start_time" class="form-control">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Location</label>
+          <input type="text" name="location" class="form-control" placeholder="Where is the event?">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="Details about the event..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Add Event</button>
+        <button type="button" onclick="closeModal('newEventModal')" class="btn btn-outline">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

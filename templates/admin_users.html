@@ -24,16 +24,26 @@
         {% for u in users %}
         <tr {% if u.id == session.get('user_id') %}style="background:#fffbeb;"{% endif %}>
           <td>
-            <div class="fw-bold">{{ u.first_name or '—' }} {{ u.last_name or '' }}</div>
+            <div class="fw-bold">{{ u.first_name or u.email.split('@')[0] }} {{ u.last_name or '' }}</div>
             <div class="fs-sm text-slate">Joined {{ u.created_at[:10] if u.created_at else '—' }}</div>
           </td>
           <td class="fs-sm">{{ u.email }}</td>
           <td>
-            {% if u.first_name %}
-            <span class="badge badge-active">Linked ✅</span>
-            {% if u.is_choir_member %}<span class="badge" style="background:#eff6ff;color:#1e40af;margin-left:4px;">🎵 Choir</span>{% endif %}
+            {% if u.member_id %}
+              <span class="badge badge-active">✅ {{ u.member_first }} {{ u.member_last }}</span>
+              {% if u.is_choir_member %}<span class="badge" style="background:#eff6ff;color:#1e40af;margin-left:4px;">🎵 Choir</span>{% endif %}
             {% else %}
-            <span class="badge badge-inactive">Not linked</span>
+              <span class="badge badge-inactive">Not linked</span>
+              {% if u.id != session.get('user_id') %}
+              <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap;">
+                <!-- Auto-link by email -->
+                <form method="POST" action="{{ url_for('auto_link_user_member', user_id=u.id) }}" style="display:inline;">
+                  <button type="submit" class="btn btn-xs btn-outline" title="Try to match by email">🔗 Auto-link</button>
+                </form>
+                <!-- Manual link -->
+                <button class="btn btn-xs btn-gold" onclick="openLinkModal({{ u.id }}, '{{ u.first_name or u.email }}')">👤 Link</button>
+              </div>
+              {% endif %}
             {% endif %}
           </td>
           <td>
@@ -95,7 +105,7 @@
           ('🎵 Choir Admin',    'Choir roster, attendance, songs, duty roster', 'Finance records, user management'),
           ('📰 Content Admin',  'News & blog posts, prayer verses, scripture', 'Finance, choir admin'),
           ('📅 Events Admin',   'Events creation and management',      'Finance, choir, content'),
-          ('👤 Member',         'My portal, my giving, choir schedule (if choir member), news read/comment/like', 'All admin features'),
+          ('👤 Member',         'My portal, my giving, fellowship, news', 'All admin features'),
         ] %}
         <tr>
           <td class="fw-bold fs-sm">{{ role }}</td>
@@ -107,7 +117,6 @@
     </table>
   </div>
 </div>
-
 
 <!-- RESET PASSWORD MODAL -->
 <div class="modal-overlay" id="resetPwModal">
@@ -134,6 +143,37 @@
   </div>
 </div>
 
+<!-- MANUAL LINK MODAL -->
+<div class="modal-overlay" id="linkMemberModal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <div class="modal-title">👤 Link User to Member Profile</div>
+      <button class="modal-close" onclick="closeModal('linkMemberModal')">✕</button>
+    </div>
+    <form id="linkMemberForm" method="POST">
+      <div class="modal-body">
+        <p class="fs-sm text-slate" style="margin-bottom:14px;">
+          Linking account: <strong id="linkUserName"></strong>
+        </p>
+        <div class="form-group">
+          <label class="form-label">Select Member Profile *</label>
+          <select name="member_id" class="form-control" required>
+            <option value="">— Choose member —</option>
+            {% for m in all_members %}
+            <option value="{{ m.id }}">{{ m.first_name }} {{ m.last_name }}{% if m.email %} ({{ m.email }}){% endif %}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <p class="fs-sm text-slate">Only unlinked member profiles are shown.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('linkMemberModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Link Profile</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -142,6 +182,11 @@ function openResetModal(userId, name) {
   document.getElementById('resetPwForm').action = '/admin/users/' + userId + '/reset-password';
   document.getElementById('resetUserName').textContent = name;
   openModal('resetPwModal');
+}
+function openLinkModal(userId, name) {
+  document.getElementById('linkMemberForm').action = '/admin/users/' + userId + '/link-member';
+  document.getElementById('linkUserName').textContent = name;
+  openModal('linkMemberModal');
 }
 </script>
 {% endblock %}

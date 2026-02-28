@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}{% if fellowship %}Edit Fellowship{% else %}New Fellowship{% endif %}{% endblock %}
+{% block page_title %}{% if fellowship %}Edit Fellowship{% else %}New House Fellowship{% endif %}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:640px;">
+  <div class="card-body">
+    <form method="POST">
+      <div class="form-group">
+        <label class="form-label">Fellowship Name *</label>
+        <input type="text" name="name" class="form-control" required value="{{ fellowship.name if fellowship else '' }}" placeholder="e.g. Champions Westerners House Fellowship">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <textarea name="description" class="form-control" rows="3" placeholder="Brief description of this fellowship...">{{ fellowship.description if fellowship else '' }}</textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Meeting Location</label>
+        <input type="text" name="location" class="form-control" value="{{ fellowship.location if fellowship else '' }}" placeholder="e.g. 123 Main St NW">
+      </div>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Meeting Day</label>
+          <select name="meeting_day" class="form-control">
+            <option value="">— Select —</option>
+            {% for day in ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] %}
+            <option value="{{ day }}" {% if fellowship and fellowship.meeting_day == day %}selected{% endif %}>{{ day }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Meeting Time</label>
+          <input type="time" name="meeting_time" class="form-control" value="{{ fellowship.meeting_time if fellowship else '' }}">
+        </div>
+      </div>
+      {% if fellowship %}
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+          <input type="checkbox" name="is_active" {% if fellowship.is_active %}checked{% endif %}> Active Fellowship
+        </label>
+      </div>
+      {% endif %}
+      <div class="d-flex gap-1 mt-2">
+        <button type="submit" class="btn btn-primary">{% if fellowship %}Save Changes{% else %}Create Fellowship{% endif %}</button>
+        <a href="{{ url_for('fellowship_index') }}" class="btn btn-outline">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

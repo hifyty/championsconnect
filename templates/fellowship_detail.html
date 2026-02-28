@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}{{ hf.name }}{% endblock %}
+{% block page_title %}🏠 {{ hf.name }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('fellowship_announcements', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">📢 Announcements</a>
+  <a href="{{ url_for('fellowship_prayer', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">🙏 Prayer</a>
+  <a href="{{ url_for('fellowship_attendance', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">✅ Attendance</a>
+  <a href="{{ url_for('fellowship_events', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">📅 Events</a>
+  {% if session.get('role') in ['super_admin','admin'] %}
+  <a href="{{ url_for('fellowship_edit', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">✏️ Edit</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+
+{% if hf.description or hf.location or hf.meeting_day %}
+<div class="card mb-2" style="border-left:4px solid var(--navy);">
+  <div class="card-body" style="padding:14px 20px;">
+    <div class="d-flex gap-2" style="flex-wrap:wrap;align-items:center;">
+      {% if hf.description %}<span class="text-slate fs-sm">{{ hf.description }}</span>{% endif %}
+      {% if hf.location %}<span class="badge badge-info">📍 {{ hf.location }}</span>{% endif %}
+      {% if hf.meeting_day %}<span class="badge badge-scheduled">📅 {{ hf.meeting_day }}{% if hf.meeting_time %} at {{ hf.meeting_time }}{% endif %}</span>{% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="grid-2">
+
+  <!-- MEMBER ROSTER -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">👥 Members ({{ members|length }})</div>
+      {% if session.get('role') in ['super_admin','admin'] or my_role == 'leader' %}
+      <button class="btn btn-sm btn-primary" onclick="openModal('addMemberModal')">➕ Add</button>
+      {% endif %}
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if members %}
+      <table>
+        <thead><tr><th>Name</th><th>Role</th><th>Voice</th>{% if session.get('role') in ['super_admin','admin'] %}<th></th>{% endif %}</tr></thead>
+        <tbody>
+          {% for m in members %}
+          <tr>
+            <td>
+              <strong>{{ m.first_name }} {{ m.last_name }}</strong>
+              {% if m.email %}<div class="fs-sm text-slate">{{ m.email }}</div>{% endif %}
+            </td>
+            <td>
+              <span class="badge badge-{{ 'success' if m.role == 'leader' else 'info' }}">{{ m.role | title }}</span>
+            </td>
+            <td class="fs-sm text-slate">{{ m.voice_part or '—' }}</td>
+            {% if session.get('role') in ['super_admin','admin'] %}
+            <td>
+              <form method="POST" action="{{ url_for('fellowship_change_role', fellowship_id=hf.id, fm_id=m.id) }}" style="display:inline;">
+                <select name="role" onchange="this.form.submit()" class="form-control" style="padding:4px 8px;font-size:0.75rem;width:auto;display:inline;">
+                  <option value="member" {% if m.role=='member' %}selected{% endif %}>Member</option>
+                  <option value="leader" {% if m.role=='leader' %}selected{% endif %}>Leader</option>
+                </select>
+              </form>
+              <form method="POST" action="{{ url_for('fellowship_remove_member', fellowship_id=hf.id, fm_id=m.id) }}" style="display:inline;" onsubmit="return confirm('Remove this member?')">
+                <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#dc2626;">✕</button>
+              </form>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state"><div class="icon">👥</div><p>No members yet</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ANNOUNCEMENTS PREVIEW -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📢 Latest Announcements</div>
+      <a href="{{ url_for('fellowship_announcements', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if announcements %}
+      {% for a in announcements %}
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);">
+        <div style="font-weight:600;font-size:0.9rem;">{{ a.title }}</div>
+        <div class="fs-sm text-slate" style="margin-top:4px;">{{ a.body[:120] }}{% if a.body|length > 120 %}…{% endif %}</div>
+        <div class="fs-sm text-slate" style="margin-top:6px;">{{ a.author }} · {{ a.created_at[:10] }}</div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><div class="icon">📢</div><p>No announcements yet</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<div class="grid-2 mt-2">
+
+  <!-- PRAYER REQUESTS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🙏 Active Prayer Requests</div>
+      <a href="{{ url_for('fellowship_prayer', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if prayer_requests %}
+      {% for p in prayer_requests %}
+      <div style="padding:12px 18px;border-bottom:1px solid var(--border);">
+        <div class="fs-sm">{{ p.request_text[:100] }}{% if p.request_text|length > 100 %}…{% endif %}</div>
+        <div class="fs-sm text-slate" style="margin-top:4px;">— {{ p.submitter_name or 'Anonymous' }} · {{ p.created_at[:10] }}</div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><div class="icon">🙏</div><p>No active prayer requests</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- UPCOMING EVENTS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📅 Upcoming Events</div>
+      <a href="{{ url_for('fellowship_events', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if upcoming_events %}
+      {% for e in upcoming_events %}
+      <div style="padding:12px 18px;border-bottom:1px solid var(--border);">
+        <div style="font-weight:600;font-size:0.88rem;">{{ e.title }}</div>
+        <div class="fs-sm text-slate">{{ e.event_date }}{% if e.start_time %} at {{ e.start_time }}{% endif %}{% if e.location %} · {{ e.location }}{% endif %}</div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><div class="icon">📅</div><p>No upcoming events</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+
+<!-- ADD MEMBER MODAL -->
+{% if session.get('role') in ['super_admin','admin'] or my_role == 'leader' %}
+<div class="modal-overlay" id="addMemberModal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-header">
+      <div class="modal-title">Add Member to Fellowship</div>
+      <button onclick="closeModal('addMemberModal')" class="modal-close">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('fellowship_add_member', fellowship_id=hf.id) }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Select Member</label>
+          <select name="member_id" class="form-control" required>
+            <option value="">— Choose a member —</option>
+            {% set current_ids = members | map(attribute='member_id') | list %}
+            {% for m in range(1) %}{% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Role in Fellowship</label>
+          <select name="role" class="form-control">
+            <option value="member">Member</option>
+            <option value="leader">Leader</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Add Member</button>
+        <button type="button" onclick="closeModal('addMemberModal')" class="btn btn-outline">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}
+{% block scripts %}
+<script>
+// Populate member dropdown dynamically
+fetch('/members/json').then(r => r.json()).then(data => {
+  const sel = document.querySelector('select[name="member_id"]');
+  if (!sel) return;
+  const current = {{ members | map(attribute='member_id') | list | tojson }};
+  data.forEach(m => {
+    if (!current.includes(m.id)) {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      opt.textContent = m.first_name + ' ' + m.last_name + (m.voice_part ? ' (' + m.voice_part + ')' : '');
+      sel.appendChild(opt);
+    }
+  });
+}).catch(() => {});
+</script>
+{% endblock %}

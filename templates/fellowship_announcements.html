@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% block title %}{{ hf.name }} — Announcements{% endblock %}
+{% block page_title %}📢 {{ hf.name }}{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('fellowship_detail', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">← Back</a>
+{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header"><div class="card-title">Post Announcement</div></div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Title *</label>
+          <input type="text" name="title" class="form-control" required placeholder="Announcement title">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Message *</label>
+          <textarea name="body" class="form-control" rows="5" required placeholder="Write your announcement here..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">Post Announcement</button>
+      </form>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><div class="card-title">All Announcements</div></div>
+    <div class="card-body" style="padding:0;">
+      {% if announcements %}
+      {% for a in announcements %}
+      <div style="padding:16px 18px;border-bottom:1px solid var(--border);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+          <div style="font-weight:600;">{{ a.title }}</div>
+          {% if session.get('role') in ['super_admin','admin'] %}
+          <form method="POST" action="{{ url_for('fellowship_delete_announcement', fellowship_id=hf.id, ann_id=a.id) }}" onsubmit="return confirm('Delete this announcement?')">
+            <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#dc2626;">✕</button>
+          </form>
+          {% endif %}
+        </div>
+        <div class="text-slate" style="margin-top:6px;font-size:0.88rem;line-height:1.6;">{{ a.body }}</div>
+        <div class="fs-sm text-slate" style="margin-top:8px;">{{ a.author }} · {{ a.created_at[:10] }}</div>
+      </div>
+      {% endfor %}
+      {% else %}
+      <div class="empty-state"><div class="icon">📢</div><p>No announcements yet</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

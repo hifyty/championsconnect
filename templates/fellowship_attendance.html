@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block title %}{{ hf.name }} — Attendance{% endblock %}
+{% block page_title %}✅ {{ hf.name }} — Attendance{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('fellowship_detail', fellowship_id=hf.id) }}" class="btn btn-sm btn-outline">← Back</a>
+  <button class="btn btn-primary" onclick="openModal('newSessionModal')">➕ New Session</button>
+{% endblock %}
+{% block content %}
+<div class="card mb-2">
+  <div class="card-header"><div class="card-title">Attendance History</div></div>
+  <div class="card-body" style="padding:0;">
+    {% if sessions %}
+    <table>
+      <thead><tr><th>Date</th><th>Type</th><th>Present</th><th>Total</th><th>Rate</th></tr></thead>
+      <tbody>
+        {% for s in sessions %}
+        <tr>
+          <td><strong>{{ s.session_date }}</strong></td>
+          <td>{{ s.session_type }}</td>
+          <td class="text-success fw-bold">{{ s.present_count or 0 }}</td>
+          <td>{{ s.total or 0 }}</td>
+          <td>
+            {% if s.total and s.total > 0 %}
+            {% set pct = ((s.present_count or 0) / s.total * 100)|int %}
+            <div style="display:flex;align-items:center;gap:8px;">
+              <div style="flex:1;height:6px;background:var(--border);border-radius:3px;">
+                <div style="width:{{ pct }}%;height:6px;background:var(--success);border-radius:3px;"></div>
+              </div>
+              <span class="fs-sm">{{ pct }}%</span>
+            </div>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state"><div class="icon">✅</div><p>No attendance sessions recorded yet</p></div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- NEW SESSION MODAL -->
+<div class="modal-overlay" id="newSessionModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">Record Attendance</div>
+      <button onclick="closeModal('newSessionModal')" class="modal-close">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('fellowship_attendance_new', fellowship_id=hf.id) }}">
+      <div class="modal-body">
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Date *</label>
+            <input type="date" name="session_date" class="form-control" required value="{{ now.strftime('%Y-%m-%d') }}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Session Type</label>
+            <select name="session_type" class="form-control">
+              <option>Regular Meeting</option>
+              <option>Bible Study</option>
+              <option>Prayer Night</option>
+              <option>Special Event</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Notes</label>
+          <input type="text" name="notes" class="form-control" placeholder="Optional notes">
+        </div>
+        {% if members %}
+        <div class="form-group">
+          <label class="form-label">Mark Attendance</label>
+          <table>
+            <thead><tr><th>Member</th><th>Present</th><th>Absent</th><th>Excused</th></tr></thead>
+            <tbody>
+              {% for m in members %}
+              <tr>
+                <td>{{ m.first_name }} {{ m.last_name }}</td>
+                <td><input type="radio" name="status_{{ m.member_id }}" value="present" checked></td>
+                <td><input type="radio" name="status_{{ m.member_id }}" value="absent"></td>
+                <td><input type="radio" name="status_{{ m.member_id }}" value="excused"></td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-slate fs-sm">No members in this fellowship yet. Add members first.</p>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Save Attendance</button>
+        <button type="button" onclick="closeModal('newSessionModal')" class="btn btn-outline">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

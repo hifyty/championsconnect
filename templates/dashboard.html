@@ -1,113 +1,250 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}
+  {% if view == 'super_admin' %}System Dashboard{% else %}Dashboard{% endif %}
+{% endblock %}
 
 {% block content %}
 
+{% if view == 'super_admin' %}
+<!-- SUPER ADMIN: Command Centre -->
 <div class="stats-grid">
   <div class="stat-card blue">
     <div class="stat-icon">👥</div>
     <div>
-      <div class="stat-value">{{ total_members }}</div>
+      <div class="stat-value">{{ active_members }}</div>
       <div class="stat-label">Active Members</div>
+      {% if new_this_month > 0 %}
+      <div style="font-size:0.72rem;color:var(--success);margin-top:4px;">+{{ new_this_month }} this month</div>
+      {% endif %}
     </div>
   </div>
   <div class="stat-card green">
-    <div class="stat-icon">💰</div>
+    <div class="stat-icon">🔑</div>
     <div>
-      <div class="stat-value">${{ "%.0f"|format(total_donations) }}</div>
-      <div class="stat-label">This Month's Donations</div>
+      <div class="stat-value">{{ total_users }}</div>
+      <div class="stat-label">Registered Users</div>
+    </div>
+  </div>
+  <div class="stat-card {% if pending_count > 0 %}orange{% else %}purple{% endif %}">
+    <div class="stat-icon">{% if pending_count > 0 %}⚠️{% else %}✅{% endif %}</div>
+    <div>
+      <div class="stat-value">{{ pending_count }}</div>
+      <div class="stat-label">Pending User Approvals</div>
     </div>
   </div>
   <div class="stat-card">
-    <div class="stat-icon">📋</div>
+    <div class="stat-icon">🏠</div>
     <div>
-      <div class="stat-value">{{ upcoming_duties|length }}</div>
-      <div class="stat-label">Upcoming Duties</div>
-    </div>
-  </div>
-  <div class="stat-card purple">
-    <div class="stat-icon">🎵</div>
-    <div>
-      <div class="stat-value">
-        {% set parts = [] %}
-        {% for row in member_breakdown %}{% set _ = parts.append(row['count']) %}{% endfor %}
-        {{ parts|sum if parts else 0 }}
-      </div>
-      <div class="stat-label">Choir Voices Logged</div>
+      <div class="stat-value">{{ total_fellowships }}</div>
+      <div class="stat-label">House Fellowships</div>
     </div>
   </div>
 </div>
 
 <div class="grid-2">
-  <!-- UPCOMING DUTIES -->
+  <!-- RECENT ACTIVITY -->
   <div class="card">
     <div class="card-header">
-      <div class="card-title">📋 Upcoming Duties</div>
-      <a href="{{ url_for('roster') }}" class="btn btn-sm btn-outline">View All</a>
+      <div class="card-title">⚡ Recent Activity</div>
     </div>
     <div class="card-body" style="padding:0;">
-      {% if upcoming_duties %}
+      {% if recent_activity %}
       <table>
-        <thead>
-          <tr>
-            <th>Member</th>
-            <th>Duty</th>
-            <th>Date</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Type</th><th>Name</th><th>Detail</th><th>When</th></tr></thead>
         <tbody>
-          {% for d in upcoming_duties %}
+          {% for a in recent_activity %}
           <tr>
-            <td>
-              <strong>{{ d.first_name }} {{ d.last_name }}</strong>
-              <div class="fs-sm text-slate">{{ d.voice_part }}</div>
-            </td>
-            <td>{{ d.duty_type }}</td>
-            <td class="fs-sm">{{ d.scheduled_date }}</td>
-            <td><span class="badge badge-{{ d.status }}">{{ d.status }}</span></td>
+            <td><span class="badge badge-{{ 'info' if a.activity_type == 'New User' else 'success' }}">{{ a.activity_type }}</span></td>
+            <td><strong>{{ a.name }}</strong></td>
+            <td class="fs-sm text-slate">{{ a.detail or '—' }}</td>
+            <td class="fs-sm text-slate">{{ a.created_at[:10] if a.created_at else '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
       {% else %}
-      <div class="empty-state">
-        <div class="icon">📋</div>
-        <p>No upcoming duties scheduled</p>
-      </div>
+      <div class="empty-state"><div class="icon">⚡</div><p>No recent activity</p></div>
       {% endif %}
     </div>
   </div>
 
-  <!-- RECENT DONATIONS -->
+  <!-- PENDING USER APPROVALS -->
   <div class="card">
     <div class="card-header">
-      <div class="card-title">💰 Recent Donations</div>
-      <a href="{{ url_for('finance') }}" class="btn btn-sm btn-outline">View All</a>
+      <div class="card-title">🔔 Users & Roles</div>
+      <a href="{{ url_for('admin_users') }}" class="btn btn-sm btn-outline">Manage All</a>
     </div>
     <div class="card-body" style="padding:0;">
-      {% if recent_donations %}
+      {% if pending_users %}
       <table>
-        <thead>
-          <tr>
-            <th>Donor</th>
-            <th>Category</th>
-            <th>Amount</th>
-          </tr>
-        </thead>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead>
         <tbody>
-          {% for d in recent_donations %}
+          {% for u in pending_users %}
           <tr>
-            <td>
-              <strong>
-                {% if d.first_name %}{{ d.first_name }} {{ d.last_name }}
-                {% elif d.donor_name %}{{ d.donor_name }}
-                {% else %}Anonymous{% endif %}
-              </strong>
-              <div class="fs-sm text-slate">{{ d.donation_date }}</div>
-            </td>
-            <td>
+            <td><strong>{{ u.first_name }} {{ u.last_name }}</strong></td>
+            <td class="fs-sm">{{ u.email }}</td>
+            <td><span class="badge badge-{{ 'success' if u.role == 'super_admin' else 'info' if u.role != 'member' else 'scheduled' }}">{{ u.role | replace('_', ' ') | title }}</span></td>
+            <td class="fs-sm text-slate">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state"><div class="icon">✅</div><p>No pending approvals</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="grid-2 mt-2">
+  <!-- HOUSE FELLOWSHIP OVERVIEW -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🏠 House Fellowships</div>
+      <a href="{{ url_for('fellowship_index') }}" class="btn btn-sm btn-outline">View All</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if fellowship_summary %}
+      <table>
+        <thead><tr><th>Fellowship</th><th>Members</th><th></th></tr></thead>
+        <tbody>
+          {% for f in fellowship_summary %}
+          <tr>
+            <td><strong>{{ f.name }}</strong></td>
+            <td><span class="badge badge-info">{{ f.member_count }} members</span></td>
+            <td><a href="{{ url_for('fellowship_detail', fellowship_id=f.id) }}" class="btn btn-sm btn-outline">Open</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state"><div class="icon">🏠</div><p>No fellowships yet</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ROLE BREAKDOWN -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🔑 User Role Breakdown</div>
+    </div>
+    <div class="card-body">
+      {% if role_breakdown %}
+      <div class="d-flex gap-2" style="flex-wrap:wrap;">
+        {% for r in role_breakdown %}
+        <div style="background:var(--ivory2);border-radius:10px;padding:16px 24px;text-align:center;flex:1;min-width:90px;">
+          <div style="font-size:1.6rem;font-weight:700;color:var(--navy);">{{ r.count }}</div>
+          <div style="font-size:0.75rem;color:var(--slate);margin-top:4px;">{{ r.role | replace('_',' ') | title }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-state"><p>No users found</p></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% if daily_verse %}
+<div class="card mt-2" style="border-left:4px solid var(--gold);">
+  <div class="card-body">
+    <div style="font-size:0.72rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">✝ Verse of the Day</div>
+    <div style="font-style:italic;color:var(--slate);line-height:1.7;">"{{ daily_verse.verse_text }}"</div>
+    <div style="font-size:0.8rem;font-weight:600;color:var(--navy);margin-top:8px;">— {{ daily_verse.reference }}</div>
+  </div>
+</div>
+{% endif %}
+
+{% else %}
+<!-- MEMBER VIEW — personal info only -->
+
+<!-- Welcome banner -->
+<div style="background:linear-gradient(135deg,var(--navy),#243560);border-radius:var(--radius);padding:22px 28px;margin-bottom:24px;color:#fff;">
+  <div class="d-flex align-center justify-between" style="flex-wrap:wrap;gap:12px;">
+    <div>
+      <h2 style="font-size:1.3rem;margin-bottom:4px;">Welcome back{% if my_member %}, {{ my_member.first_name }}{% endif %}! 🙌</h2>
+      <p style="color:rgba(255,255,255,.65);font-size:0.85rem;">{{ now.strftime('%A, %B %d, %Y') }}</p>
+    </div>
+    <a href="{{ url_for('member_portal') }}" class="btn btn-sm" style="background:var(--gold);color:var(--navy);">My Portal →</a>
+  </div>
+</div>
+
+<!-- My stats -->
+<div class="stats-grid">
+  <div class="stat-card blue">
+    <div class="stat-icon">📋</div>
+    <div>
+      <div class="stat-value">{{ my_duties|length }}</div>
+      <div class="stat-label">My Upcoming Duties</div>
+    </div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon">💰</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(this_year_given) }}</div>
+      <div class="stat-label">My Giving This Year</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">💰</div>
+    <div>
+      <div class="stat-value">${{ "%.0f"|format(my_total_given) }}</div>
+      <div class="stat-label">My Total Contributions</div>
+    </div>
+  </div>
+  <div class="stat-card purple">
+    <div class="stat-icon">🏠</div>
+    <div>
+      <div class="stat-value">{{ my_fellowship.name.split()[-2] if my_fellowship else '—' }}</div>
+      <div class="stat-label">My Fellowship</div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+
+  <!-- MY UPCOMING DUTIES -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📋 My Upcoming Duties</div>
+      <a href="{{ url_for('roster') }}" class="btn btn-sm btn-outline">Full Roster</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if my_duties %}
+      <table>
+        <thead><tr><th>Date</th><th>Duty</th><th>Service</th></tr></thead>
+        <tbody>
+          {% for d in my_duties %}
+          <tr>
+            <td class="fw-bold fs-sm">{{ d.scheduled_date }}</td>
+            <td>{{ d.duty_type }}</td>
+            <td class="fs-sm text-slate">{{ d.service_type or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state"><div class="icon">📋</div><p>No upcoming duties assigned</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- MY RECENT DONATIONS -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">💰 My Recent Giving</div>
+      <a href="{{ url_for('finance') }}" class="btn btn-sm btn-outline">Full History</a>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if my_donations %}
+      <table>
+        <thead><tr><th>Date</th><th>Category</th><th>Amount</th></tr></thead>
+        <tbody>
+          {% for d in my_donations %}
+          <tr>
+            <td class="fs-sm">{{ d.donation_date }}</td>
+            <td class="fs-sm">
               <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ d.color or '#ccc' }};margin-right:5px;"></span>
               {{ d.category_name or 'General' }}
             </td>
@@ -117,32 +254,22 @@
         </tbody>
       </table>
       {% else %}
-      <div class="empty-state">
-        <div class="icon">💰</div>
-        <p>No donations recorded yet</p>
-      </div>
+      <div class="empty-state"><div class="icon">💰</div><p>No donations recorded yet</p></div>
       {% endif %}
     </div>
   </div>
+
 </div>
 
-<!-- VOICE BREAKDOWN -->
-{% if member_breakdown %}
-<div class="card mt-2">
-  <div class="card-header">
-    <div class="card-title">🎶 Choir Voice Distribution</div>
-  </div>
+{% if daily_verse %}
+<div class="card mt-2" style="border-left:4px solid var(--gold);">
   <div class="card-body">
-    <div class="d-flex gap-2" style="flex-wrap:wrap;">
-      {% for row in member_breakdown %}
-      <div style="background:var(--ivory2);border-radius:10px;padding:18px 28px;text-align:center;flex:1;min-width:100px;">
-        <div style="font-size:1.8rem;font-weight:700;color:var(--navy);">{{ row.count }}</div>
-        <div style="font-size:0.8rem;color:var(--slate);margin-top:4px;">{{ row.voice_part or 'Unassigned' }}</div>
-      </div>
-      {% endfor %}
-    </div>
+    <div style="font-size:0.72rem;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--gold);margin-bottom:8px;">✝ Verse of the Day</div>
+    <div style="font-style:italic;color:var(--slate);line-height:1.7;">"{{ daily_verse.verse_text }}"</div>
+    <div style="font-size:0.8rem;font-weight:600;color:var(--navy);margin-top:8px;">— {{ daily_verse.reference }}</div>
   </div>
 </div>
 {% endif %}
 
+{% endif %}
 {% endblock %}

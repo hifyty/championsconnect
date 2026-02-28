@@ -831,6 +831,12 @@ def login():
             session['user_id'] = user['id']
             session['role']    = user['role']
             session['name']    = f"{user['first_name']} {user['last_name']}"
+            # Check if this user is a choir member — used to show/hide choir nav
+            choir_check = query_db("""SELECT cm.id FROM choir_members cm
+                JOIN members m ON cm.member_id=m.id
+                WHERE (m.user_id=? OR m.email=?) AND cm.is_active=1""",
+                [user['id'], user['email']], one=True)
+            session['is_choir_member'] = choir_check is not None
             flash(f"Welcome back, {user['first_name']}! 🙌",'success')
             return redirect(url_for('dashboard'))
         flash('Invalid email or password.','danger')
@@ -908,28 +914,64 @@ def dashboard():
             pending_users=pending_users, pending_count=pending_count,
             recent_activity=recent_activity, role_breakdown=role_breakdown,
             fellowship_summary=fellowship_summary, total_fellowships=total_fellowships,
-            daily_verse=daily_verse, pinned_news=pinned_news)
+            daily_verse=daily_verse, pinned_news=pinned_news,
+            total_donations=0, upcoming_duties=[], recent_donations=[], member_breakdown=[])
 
     else:
-        # ── Standard / member dashboard ──
-        total_members    = query_db("SELECT COUNT(*) as c FROM members WHERE status='active'", one=True)['c']
-        total_donations  = query_db("SELECT COALESCE(SUM(amount),0) as t FROM donations WHERE strftime('%Y-%m',donation_date)=strftime('%Y-%m','now')", one=True)['t']
-        upcoming_duties  = query_db("""SELECT dr.*,m.first_name,m.last_name,m.voice_part FROM duty_roster dr
-            JOIN members m ON dr.member_id=m.id WHERE dr.scheduled_date>=date('now')
-            ORDER BY dr.scheduled_date ASC LIMIT 5""")
-        recent_donations = query_db("""SELECT d.*,m.first_name,m.last_name,fc.name as category_name,fc.color
-            FROM donations d LEFT JOIN members m ON d.member_id=m.id
-            LEFT JOIN finance_categories fc ON d.category_id=fc.id
-            ORDER BY d.donation_date DESC LIMIT 5""")
-        member_breakdown = query_db("SELECT voice_part, COUNT(*) as count FROM members WHERE status='active' GROUP BY voice_part")
+        # ── Standard / member dashboard — scoped to THIS user only ──
+        user = get_current_user()
+        my_member = query_db("SELECT * FROM members WHERE user_id=?", [session['user_id']], one=True)
+        if not my_member:
+            my_member = query_db("SELECT * FROM members WHERE email=?", [user['email']], one=True)
+            if my_member:
+                execute_db("UPDATE members SET user_id=? WHERE id=?", [session['user_id'], my_member['id']])
+
+        # My upcoming duties (only mine)
+        my_duties = []
+        my_donations = []
+        my_total_given = 0
+        this_year_given = 0
+        my_fellowship = None
+
+        if my_member:
+            my_duties = query_db("""SELECT dr.* FROM duty_roster dr
+                WHERE dr.member_id=? AND dr.scheduled_date>=date('now')
+                ORDER BY dr.scheduled_date ASC LIMIT 5""", [my_member['id']])
+            my_donations = query_db("""SELECT d.*,fc.name as category_name,fc.color
+                FROM donations d LEFT JOIN finance_categories fc ON d.category_id=fc.id
+                WHERE d.member_id=? ORDER BY d.donation_date DESC LIMIT 5""", [my_member['id']])
+            my_total_given = query_db(
+                "SELECT COALESCE(SUM(amount),0) as t FROM donations WHERE member_id=?",
+                [my_member['id']], one=True)['t']
+            this_year_given = query_db(
+                "SELECT COALESCE(SUM(amount),0) as t FROM donations WHERE member_id=? AND strftime('%Y',donation_date)=strftime('%Y','now')",
+                [my_member['id']], one=True)['t']
+            my_fellowship = query_db("""SELECT hf.*, fm.role as fm_role
+                FROM house_fellowships hf JOIN fellowship_members fm ON hf.id=fm.fellowship_id
+                WHERE fm.member_id=?""", [my_member['id']], one=True)
+
+        # Is this member a choir member?
+        is_choir = my_member and query_db(
+            "SELECT id FROM choir_members WHERE member_id=? AND is_active=1",
+            [my_member['id']], one=True) is not None if my_member else False
+
         return render_template('dashboard.html',
             view='standard',
-            total_members=total_members, total_donations=total_donations,
-            upcoming_duties=upcoming_duties, recent_donations=recent_donations,
-            member_breakdown=member_breakdown, pinned_news=pinned_news, daily_verse=daily_verse)
+            my_member=my_member, my_duties=my_duties,
+            my_donations=my_donations, my_total_given=my_total_given,
+            this_year_given=this_year_given,
+            pinned_news=pinned_news, daily_verse=daily_verse,
+            my_fellowship=my_fellowship, is_choir=is_choir,
+            total_donations=0, upcoming_duties=[], recent_donations=[], member_breakdown=[])
 
 
 # ─────────── MEMBERS ───────────
+
+@app.route('/members/json')
+@login_required
+def members_json():
+    members = query_db("SELECT id,first_name,last_name,voice_part FROM members WHERE status='active' ORDER BY last_name")
+    return jsonify([dict(m) for m in members])
 
 @app.route('/members')
 @login_required
@@ -1546,12 +1588,15 @@ def delete_rehearsal(rehearsal_id):
 @app.route('/portal')
 @login_required
 def member_portal():
-    """Personal portal — member sees their own profile, duties, donations, attendance"""
+    """Personal portal — member sees their own profile, duties, donations, attendance, fellowship"""
     user = get_current_user()
-    # Find member record linked to this user, or by email
+    # Find member record linked to this user, or by email match
     member = query_db("SELECT * FROM members WHERE user_id=?", [user['id']], one=True)
     if not member:
         member = query_db("SELECT * FROM members WHERE email=?", [user['email']], one=True)
+        # Auto-link if found by email
+        if member:
+            execute_db("UPDATE members SET user_id=? WHERE id=?", [user['id'], member['id']])
     if member:
         duties = query_db("""SELECT * FROM duty_roster WHERE member_id=?
             ORDER BY scheduled_date DESC LIMIT 10""", [member['id']])
@@ -1566,16 +1611,40 @@ def member_portal():
             SELECT COUNT(*) as total,
                    SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) as present
             FROM service_attendance WHERE member_id=?""", [member['id']], one=True)
+        # Fellowship info
+        my_fellowship = query_db("""SELECT hf.*, fm.role as fm_role
+            FROM house_fellowships hf
+            JOIN fellowship_members fm ON hf.id=fm.fellowship_id
+            WHERE fm.member_id=?""", [member['id']], one=True)
+        fellowship_announcements = []
+        fellowship_events = []
+        fellowship_prayer = []
+        if my_fellowship:
+            fellowship_announcements = query_db("""SELECT fa.*, u.first_name||' '||u.last_name as author
+                FROM fellowship_announcements fa LEFT JOIN users u ON fa.created_by=u.id
+                WHERE fa.fellowship_id=? ORDER BY fa.created_at DESC LIMIT 3""", [my_fellowship['id']])
+            fellowship_events = query_db("""SELECT * FROM fellowship_events
+                WHERE fellowship_id=? AND event_date>=date('now')
+                ORDER BY event_date ASC LIMIT 3""", [my_fellowship['id']])
+            fellowship_prayer = query_db("""SELECT * FROM fellowship_prayer_requests
+                WHERE fellowship_id=? AND is_answered=0 AND is_private=0
+                ORDER BY created_at DESC LIMIT 5""", [my_fellowship['id']])
     else:
         duties = upcoming_duties = donations = []
         total_given = 0
         attendance_rate = None
+        my_fellowship = None
+        fellowship_announcements = fellowship_events = fellowship_prayer = []
 
     daily_verse = get_daily_verse()
     return render_template('portal.html', member=member, duties=duties,
         upcoming_duties=upcoming_duties, donations=donations,
         total_given=total_given, attendance_rate=attendance_rate,
-        daily_verse=daily_verse, user=user)
+        daily_verse=daily_verse, user=user,
+        my_fellowship=my_fellowship,
+        fellowship_announcements=fellowship_announcements,
+        fellowship_events=fellowship_events,
+        fellowship_prayer=fellowship_prayer)
 
 
 # ─────────── PASSWORD MANAGEMENT ───────────
@@ -2254,11 +2323,42 @@ def qb_sync_to_qb():
 @app.route('/admin/users')
 @super_admin_required
 def admin_users():
-    users = query_db("""SELECT u.*, m.first_name, m.last_name, m.is_choir_member
-        FROM users u LEFT JOIN members m ON m.email=u.email
+    users = query_db("""SELECT u.*,
+        m.id as member_id, m.first_name as member_first, m.last_name as member_last,
+        m.is_choir_member, m.voice_part
+        FROM users u
+        LEFT JOIN members m ON (m.user_id=u.id OR (m.user_id IS NULL AND m.email=u.email))
         ORDER BY u.created_at DESC""")
+    all_members = query_db("""SELECT m.id, m.first_name, m.last_name, m.email
+        FROM members m WHERE m.user_id IS NULL
+        ORDER BY m.last_name, m.first_name""")
     all_roles = ['super_admin','finance_admin','choir_admin','content_admin','events_admin','member']
-    return render_template('admin_users.html', users=users, all_roles=all_roles)
+    return render_template('admin_users.html', users=users, all_roles=all_roles, all_members=all_members)
+
+@app.route('/admin/users/<int:user_id>/link-member', methods=['POST'])
+@super_admin_required
+def link_user_member(user_id):
+    member_id = request.form.get('member_id')
+    if member_id:
+        # Clear any existing link for that member first
+        execute_db("UPDATE members SET user_id=NULL WHERE user_id=?", [user_id])
+        execute_db("UPDATE members SET user_id=? WHERE id=?", [user_id, member_id])
+        flash('User linked to member profile! ✅', 'success')
+    return redirect(url_for('admin_users'))
+
+@app.route('/admin/users/<int:user_id>/auto-link', methods=['POST'])
+@super_admin_required
+def auto_link_user_member(user_id):
+    """Auto-link by matching email address"""
+    user = query_db('SELECT * FROM users WHERE id=?', [user_id], one=True)
+    if user:
+        member = query_db('SELECT * FROM members WHERE email=? AND user_id IS NULL', [user['email']], one=True)
+        if member:
+            execute_db('UPDATE members SET user_id=? WHERE id=?', [user_id, member['id']])
+            flash(f'Auto-linked to {member["first_name"]} {member["last_name"]}! ✅', 'success')
+        else:
+            flash('No unlinked member found with matching email.', 'warning')
+    return redirect(url_for('admin_users'))
 
 @app.route('/admin/users/<int:user_id>/role', methods=['POST'])
 @super_admin_required
