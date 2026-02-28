@@ -734,7 +734,7 @@ def get_user_fellowship(user_id):
         JOIN members m ON fm.member_id=m.id
         WHERE m.user_id=?""", [user_id], one=True)
 
-
+def login_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'user_id' not in session:
