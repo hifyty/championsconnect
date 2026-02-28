@@ -3,23 +3,20 @@
 {% block page_title %}Member Directory{% endblock %}
 
 {% block topbar_actions %}
+{% if session.get('role') in ['super_admin','admin','choir_admin','finance_admin','content_admin','events_admin'] %}
 <a href="{{ url_for('add_member') }}" class="btn btn-gold">+ Add Member</a>
+{% endif %}
 {% endblock %}
 
 {% block content %}
 
 <!-- SEARCH & FILTER -->
 <form method="GET" class="search-bar">
-  <input class="search-input" type="text" name="search" placeholder="🔍  Search by name or email..." value="{{ search }}">
-  <select name="voice" style="padding:9px 14px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.875rem;outline:none;">
-    <option value="">All Voice Parts</option>
-    {% for vp in ['Soprano','Alto','Tenor','Bass'] %}
-    <option value="{{ vp }}" {% if voice==vp %}selected{% endif %}>{{ vp }}</option>
-    {% endfor %}
-  </select>
+  <input class="search-input" type="text" name="search"
+         placeholder="🔍  Search by name or email..." value="{{ search }}">
   <select name="status" style="padding:9px 14px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.875rem;outline:none;">
     <option value="">All Statuses</option>
-    <option value="active" {% if status=='active' %}selected{% endif %}>Active</option>
+    <option value="active"   {% if status=='active'   %}selected{% endif %}>Active</option>
     <option value="inactive" {% if status=='inactive' %}selected{% endif %}>Inactive</option>
     <option value="on_leave" {% if status=='on_leave' %}selected{% endif %}>On Leave</option>
   </select>
@@ -40,19 +37,15 @@
       <div class="name">{{ m.first_name }} {{ m.last_name }}</div>
       <div class="meta">{{ m.email or '—' }}</div>
       <div class="meta">📞 {{ m.phone or '—' }}</div>
-      <div class="badges">
-        {% if m.voice_part %}
-        <span class="voice-badge voice-{{ m.voice_part }}">{{ m.voice_part }}</span>
-        {% endif %}
-        {% if m.section %}
-        <span class="badge" style="background:var(--ivory2);color:var(--slate);">{{ m.section }}</span>
-        {% endif %}
-        <span class="badge badge-{{ m.status }}">{{ m.status }}</span>
+      <div class="badges" style="margin-top:6px;">
+        <span class="badge badge-{{ m.status }}">{{ m.status | replace('_',' ') | title }}</span>
       </div>
+      {% if session.get('role') in ['super_admin','admin','choir_admin','finance_admin','content_admin','events_admin'] %}
       <div style="margin-top:10px;display:flex;gap:6px;">
         <a href="{{ url_for('member_detail', member_id=m.id) }}" class="btn btn-sm btn-primary">View</a>
         <a href="{{ url_for('edit_member', member_id=m.id) }}" class="btn btn-sm btn-outline">Edit</a>
       </div>
+      {% endif %}
     </div>
   </div>
   {% endfor %}
@@ -62,7 +55,11 @@
 <div class="empty-state">
   <div class="icon">👥</div>
   <h3>No members found</h3>
-  <p>Try adjusting your search filters or <a href="{{ url_for('add_member') }}" style="color:var(--navy);font-weight:700;">add a new member</a>.</p>
+  <p>Try adjusting your search or
+    {% if session.get('role') in ['super_admin','admin'] %}
+    <a href="{{ url_for('add_member') }}" style="color:var(--navy);font-weight:700;">add a new member</a>.
+    {% else %}contact an admin.{% endif %}
+  </p>
 </div>
 {% endif %}
 

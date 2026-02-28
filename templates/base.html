@@ -109,6 +109,9 @@
     <a href="{{ url_for('fellowship_new') }}" class="nav-link {% if request.endpoint=='fellowship_new' %}active{% endif %}">
       <span class="nav-icon">➕</span> <span>New Fellowship</span>
     </a>
+    <a href="{{ url_for('fellowship_transfer_list') }}" class="nav-link {% if request.endpoint=='fellowship_transfer_list' %}active{% endif %}">
+      <span class="nav-icon">↔</span> <span>Transfers</span>
+    </a>
     {% endif %}
 
     <!-- MY ACCOUNT — everyone -->

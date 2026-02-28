@@ -588,6 +588,21 @@ def init_db():
         );
     """)
 
+    # Fellowship transfer requests table
+    db.executescript('''
+        CREATE TABLE IF NOT EXISTS fellowship_transfer_requests (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            from_fellowship_id INTEGER REFERENCES house_fellowships(id),
+            to_fellowship_id INTEGER NOT NULL REFERENCES house_fellowships(id),
+            reason TEXT,
+            status TEXT DEFAULT 'pending',
+            reviewed_by INTEGER REFERENCES users(id),
+            reviewed_at TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    ''')
+
     # Seed 3 house fellowships
     if db.execute("SELECT COUNT(*) FROM house_fellowships").fetchone()[0] == 0:
         for name in [
@@ -977,17 +992,14 @@ def members_json():
 @login_required
 def members():
     search = request.args.get('search','')
-    voice  = request.args.get('voice','')
     status = request.args.get('status','active')
     q = "SELECT * FROM members WHERE 1=1"; params = []
     if search:
         q += " AND (first_name LIKE ? OR last_name LIKE ? OR email LIKE ?)"; params += [f'%{search}%']*3
-    if voice:
-        q += " AND voice_part=?"; params.append(voice)
     if status:
         q += " AND status=?"; params.append(status)
     q += " ORDER BY last_name,first_name"
-    return render_template('members.html', members=query_db(q,params), search=search, voice=voice, status=status)
+    return render_template('members.html', members=query_db(q,params), search=search, status=status)
 
 @app.route('/members/add', methods=['GET','POST'])
 @login_required
@@ -1636,6 +1648,16 @@ def member_portal():
         my_fellowship = None
         fellowship_announcements = fellowship_events = fellowship_prayer = []
 
+    # Pending transfer request
+    pending_transfer = None
+    if member:
+        pending_transfer = query_db("""SELECT ftr.*, hf.name as to_name
+            FROM fellowship_transfer_requests ftr
+            JOIN house_fellowships hf ON ftr.to_fellowship_id=hf.id
+            WHERE ftr.member_id=? AND ftr.status='pending'
+            ORDER BY ftr.created_at DESC LIMIT 1""", [member['id']], one=True)
+    all_fellowships = query_db("SELECT id, name FROM house_fellowships WHERE is_active=1 ORDER BY name")
+
     daily_verse = get_daily_verse()
     return render_template('portal.html', member=member, duties=duties,
         upcoming_duties=upcoming_duties, donations=donations,
@@ -1644,7 +1666,9 @@ def member_portal():
         my_fellowship=my_fellowship,
         fellowship_announcements=fellowship_announcements,
         fellowship_events=fellowship_events,
-        fellowship_prayer=fellowship_prayer)
+        fellowship_prayer=fellowship_prayer,
+        pending_transfer=pending_transfer,
+        all_fellowships=all_fellowships)
 
 
 # ─────────── PASSWORD MANAGEMENT ───────────
@@ -1742,7 +1766,13 @@ def donation_receipt(member_id):
     if not member:
         flash('Member not found.', 'danger')
         return redirect(url_for('finance'))
-    year = request.args.get('year', datetime.now().year)
+    # Security: members can only view their own receipt
+    if not is_finance_admin() and not is_super_admin():
+        my_member = query_db("SELECT * FROM members WHERE user_id=?", [session['user_id']], one=True)
+        if not my_member or my_member['id'] != member_id:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('member_portal'))
+    year = request.args.get('year', str(datetime.now().year))
     donations = query_db("""
         SELECT d.*, fc.name as category_name FROM donations d
         LEFT JOIN finance_categories fc ON d.category_id=fc.id
@@ -1752,9 +1782,232 @@ def donation_receipt(member_id):
         WHERE member_id=? AND strftime('%Y',donation_date)=?""", [member_id, str(year)], one=True)['t']
     years = query_db("""SELECT DISTINCT strftime('%Y',donation_date) as yr FROM donations
         WHERE member_id=? ORDER BY yr DESC""", [member_id])
+    by_category = query_db("""SELECT fc.name as category_name,
+        COALESCE(SUM(d.amount),0) as cat_total, COUNT(d.id) as count
+        FROM donations d LEFT JOIN finance_categories fc ON d.category_id=fc.id
+        WHERE d.member_id=? AND strftime('%Y',d.donation_date)=?
+        GROUP BY fc.name ORDER BY cat_total DESC""", [member_id, str(year)])
+    year_summary = query_db("""SELECT strftime('%Y',donation_date) as yr,
+        COALESCE(SUM(amount),0) as yr_total, COUNT(*) as count
+        FROM donations WHERE member_id=? GROUP BY yr ORDER BY yr DESC""", [member_id])
     return render_template('donation_receipt.html',
         member=member, donations=donations, total=total,
-        year=year, years=years)
+        year=year, years=years, by_category=by_category, year_summary=year_summary)
+
+
+@app.route('/finance/receipt/<int:member_id>/pdf')
+@login_required
+def donation_receipt_pdf(member_id):
+    """Generate and stream a PDF tax receipt"""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from reportlab.platypus import (SimpleDocTemplate, Paragraph, Spacer,
+                                    Table, TableStyle, HRFlowable)
+    from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+    import io
+
+    member = query_db("SELECT * FROM members WHERE id=?", [member_id], one=True)
+    if not member:
+        flash('Member not found.', 'danger')
+        return redirect(url_for('finance'))
+    if not is_finance_admin() and not is_super_admin():
+        my_member = query_db("SELECT * FROM members WHERE user_id=?", [session['user_id']], one=True)
+        if not my_member or my_member['id'] != member_id:
+            flash('Access denied.', 'danger')
+            return redirect(url_for('member_portal'))
+
+    year = request.args.get('year', str(datetime.now().year))
+    donations = query_db("""SELECT d.*, fc.name as category_name FROM donations d
+        LEFT JOIN finance_categories fc ON d.category_id=fc.id
+        WHERE d.member_id=? AND strftime('%Y',d.donation_date)=?
+        ORDER BY d.donation_date ASC""", [member_id, str(year)])
+    total = query_db("""SELECT COALESCE(SUM(amount),0) as t FROM donations
+        WHERE member_id=? AND strftime('%Y',donation_date)=?""",
+        [member_id, str(year)], one=True)['t']
+    by_category = query_db("""SELECT fc.name as category_name,
+        COALESCE(SUM(d.amount),0) as cat_total, COUNT(d.id) as count
+        FROM donations d LEFT JOIN finance_categories fc ON d.category_id=fc.id
+        WHERE d.member_id=? AND strftime('%Y',d.donation_date)=?
+        GROUP BY fc.name ORDER BY cat_total DESC""", [member_id, str(year)])
+    year_summary = query_db("""SELECT strftime('%Y',donation_date) as yr,
+        COALESCE(SUM(amount),0) as yr_total, COUNT(*) as count
+        FROM donations WHERE member_id=? GROUP BY yr ORDER BY yr DESC""", [member_id])
+
+    NAVY  = colors.HexColor('#1a2744')
+    GOLD  = colors.HexColor('#c9a84c')
+    IVORY = colors.HexColor('#faf8f2')
+    SLATE = colors.HexColor('#64748b')
+    LGRAY = colors.HexColor('#e2e8f0')
+    GREEN = colors.HexColor('#16a34a')
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter,
+        rightMargin=0.75*inch, leftMargin=0.75*inch,
+        topMargin=0.75*inch, bottomMargin=0.75*inch)
+
+    styles = getSampleStyleSheet()
+    def ps(name, **kw):
+        return ParagraphStyle(name, parent=styles['Normal'], **kw)
+
+    s_center = ps('Ctr', alignment=TA_CENTER)
+    s_h1     = ps('H1',  alignment=TA_CENTER, textColor=NAVY, fontSize=18,
+                  fontName='Helvetica-Bold', spaceAfter=4)
+    s_sub    = ps('Sub', alignment=TA_CENTER, textColor=SLATE, fontSize=10, spaceAfter=2)
+    s_tag    = ps('Tag', alignment=TA_CENTER, textColor=GOLD,  fontSize=13,
+                  fontName='Helvetica-Bold')
+    s_h2     = ps('H2',  textColor=NAVY, fontSize=11, fontName='Helvetica-Bold',
+                  spaceBefore=14, spaceAfter=6)
+    s_lbl    = ps('Lbl', textColor=SLATE, fontSize=9)
+    s_val    = ps('Val', textColor=NAVY,  fontSize=10, fontName='Helvetica-Bold')
+    s_foot   = ps('Ft',  alignment=TA_CENTER, textColor=SLATE, fontSize=8)
+    s_sig    = ps('Sig', alignment=TA_CENTER, textColor=SLATE, fontSize=8)
+
+    story = []
+
+    # ── Header ──
+    story.append(Paragraph('Champions Community Church', s_h1))
+    story.append(Paragraph('Edmonton, Alberta, Canada', s_sub))
+    story.append(Paragraph('CRA Charitable Registration No: 123456789 RR0001', s_sub))
+    story.append(Spacer(1, 0.12*inch))
+    story.append(HRFlowable(width='100%', thickness=2, color=GOLD))
+    story.append(Spacer(1, 0.08*inch))
+    story.append(Paragraph(f'OFFICIAL TAX RECEIPT FOR {year}', s_tag))
+    story.append(Spacer(1, 0.08*inch))
+    story.append(HRFlowable(width='100%', thickness=1, color=GOLD))
+    story.append(Spacer(1, 0.2*inch))
+
+    # ── Member & receipt info ──
+    receipt_no   = f'RCP-{year}-{member_id:04d}'
+    issued_date  = date.today().strftime('%B %d, %Y')
+    addr         = member['address'] or '—'
+    info = [
+        [Paragraph('<b>Receipt No:</b>',  s_lbl), Paragraph(receipt_no,  s_val),
+         Paragraph('<b>Member Name:</b>', s_lbl), Paragraph(f"{member['first_name']} {member['last_name']}", s_val)],
+        [Paragraph('<b>Tax Year:</b>',    s_lbl), Paragraph(str(year),   s_val),
+         Paragraph('<b>Email:</b>',       s_lbl), Paragraph(member['email'] or '—', s_val)],
+        [Paragraph('<b>Date Issued:</b>', s_lbl), Paragraph(issued_date, s_val),
+         Paragraph('<b>Address:</b>',     s_lbl), Paragraph(addr,        s_val)],
+    ]
+    t_info = Table(info, colWidths=[1.15*inch, 2.1*inch, 1.2*inch, 2.55*inch])
+    t_info.setStyle(TableStyle([
+        ('ROWBACKGROUNDS', (0,0), (-1,-1), [IVORY, colors.white]),
+        ('TOPPADDING',    (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING',   (0,0), (-1,-1), 8),
+        ('GRID',          (0,0), (-1,-1), 0.5, LGRAY),
+    ]))
+    story.append(t_info)
+    story.append(Spacer(1, 0.22*inch))
+
+    # ── Category summary ──
+    story.append(Paragraph('Giving Summary by Category', s_h2))
+    cat_rows = [['Category', 'Count', 'Total']]
+    for c in by_category:
+        cat_rows.append([c['category_name'] or 'General', str(c['count']), f"${c['cat_total']:,.2f}"])
+    cat_rows.append(['', '', ''])
+    cat_rows.append([f'TOTAL ELIGIBLE DONATIONS {year}', '', f"${total:,.2f}"])
+    t_cat = Table(cat_rows, colWidths=[3.6*inch, 1.4*inch, 2*inch])
+    t_cat.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0),  (-1,0),  NAVY),
+        ('TEXTCOLOR',     (0,0),  (-1,0),  colors.white),
+        ('FONTNAME',      (0,0),  (-1,0),  'Helvetica-Bold'),
+        ('ROWBACKGROUNDS',(0,1),  (-1,-3), [colors.white, IVORY]),
+        ('BACKGROUND',    (0,-1), (-1,-1), colors.HexColor('#f0fdf4')),
+        ('FONTNAME',      (0,-1), (-1,-1), 'Helvetica-Bold'),
+        ('TEXTCOLOR',     (2,-1), (2,-1),  GREEN),
+        ('FONTSIZE',      (0,-1), (-1,-1), 11),
+        ('LINEABOVE',     (0,-1), (-1,-1), 2, GOLD),
+        ('ALIGN',         (1,0),  (1,-1),  'CENTER'),
+        ('ALIGN',         (2,0),  (2,-1),  'RIGHT'),
+        ('TOPPADDING',    (0,0),  (-1,-1), 7),
+        ('BOTTOMPADDING', (0,0),  (-1,-1), 7),
+        ('LEFTPADDING',   (0,0),  (-1,-1), 10),
+        ('GRID',          (0,0),  (-1,-3), 0.5, LGRAY),
+    ]))
+    story.append(t_cat)
+    story.append(Spacer(1, 0.22*inch))
+
+    # ── Itemized donations ──
+    story.append(Paragraph('Itemized Donation History', s_h2))
+    don_rows = [['Date', 'Category', 'Method', 'Amount']]
+    for d in donations:
+        don_rows.append([
+            d['donation_date'],
+            d['category_name'] or 'General',
+            (d['payment_method'] or 'cash').title(),
+            f"${d['amount']:,.2f}"
+        ])
+    t_don = Table(don_rows, colWidths=[1.4*inch, 2.4*inch, 1.8*inch, 1.4*inch])
+    t_don.setStyle(TableStyle([
+        ('BACKGROUND',    (0,0), (-1,0),  NAVY),
+        ('TEXTCOLOR',     (0,0), (-1,0),  colors.white),
+        ('FONTNAME',      (0,0), (-1,0),  'Helvetica-Bold'),
+        ('FONTSIZE',      (0,0), (-1,-1), 9),
+        ('ROWBACKGROUNDS',(0,1), (-1,-1), [colors.white, IVORY]),
+        ('ALIGN',         (3,0), (3,-1),  'RIGHT'),
+        ('TOPPADDING',    (0,0), (-1,-1), 6),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('LEFTPADDING',   (0,0), (-1,-1), 8),
+        ('GRID',          (0,0), (-1,-1), 0.5, LGRAY),
+    ]))
+    story.append(t_don)
+    story.append(Spacer(1, 0.22*inch))
+
+    # ── Year-over-year summary (if multiple years) ──
+    if year_summary and len(year_summary) > 1:
+        story.append(Paragraph('Year-by-Year Giving Summary', s_h2))
+        yr_rows = [['Year', 'Donations', 'Total Amount']]
+        for yr in year_summary:
+            yr_rows.append([yr['yr'], str(yr['count']), f"${yr['yr_total']:,.2f}"])
+        t_yr = Table(yr_rows, colWidths=[2*inch, 2.5*inch, 2.5*inch])
+        t_yr.setStyle(TableStyle([
+            ('BACKGROUND',    (0,0), (-1,0),  NAVY),
+            ('TEXTCOLOR',     (0,0), (-1,0),  colors.white),
+            ('FONTNAME',      (0,0), (-1,0),  'Helvetica-Bold'),
+            ('FONTSIZE',      (0,0), (-1,-1), 9),
+            ('ROWBACKGROUNDS',(0,1), (-1,-1), [colors.white, IVORY]),
+            ('ALIGN',         (1,0), (-1,-1), 'CENTER'),
+            ('ALIGN',         (2,0), (2,-1),  'RIGHT'),
+            ('TOPPADDING',    (0,0), (-1,-1), 7),
+            ('BOTTOMPADDING', (0,0), (-1,-1), 7),
+            ('LEFTPADDING',   (0,0), (-1,-1), 10),
+            ('GRID',          (0,0), (-1,-1), 0.5, LGRAY),
+        ]))
+        story.append(t_yr)
+        story.append(Spacer(1, 0.25*inch))
+
+    # ── Signature block ──
+    story.append(HRFlowable(width='100%', thickness=1, color=LGRAY))
+    story.append(Spacer(1, 0.2*inch))
+    sig_rows = [[
+        Paragraph('_________________________<br/><font size=8 color="#64748b">Authorized Signature</font>', s_sig),
+        Paragraph('_________________________<br/><font size=8 color="#64748b">Date</font>', s_sig),
+        Paragraph('_________________________<br/><font size=8 color="#64748b">Church Treasurer</font>', s_sig),
+    ]]
+    t_sig = Table(sig_rows, colWidths=[2.3*inch, 2.3*inch, 2.3*inch])
+    t_sig.setStyle(TableStyle([
+        ('ALIGN',  (0,0), (-1,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 14),
+    ]))
+    story.append(t_sig)
+    story.append(Spacer(1, 0.15*inch))
+    story.append(HRFlowable(width='100%', thickness=1, color=GOLD))
+    story.append(Spacer(1, 0.1*inch))
+    story.append(Paragraph(
+        'This receipt is issued for Canadian income tax purposes. '
+        'Please retain for your records. '
+        'Champions Community Church is a registered Canadian charity.',
+        s_foot))
+
+    doc.build(story)
+    buf.seek(0)
+    from flask import Response as FlaskResponse
+    fname = f"ChampionsConnect_Receipt_{year}_{member['last_name']}.pdf"
+    return FlaskResponse(buf.read(), mimetype='application/pdf',
+        headers={'Content-Disposition': f'attachment;filename={fname}'})
+
 
 
 # ─────────── EXPORT ───────────
@@ -3245,6 +3498,135 @@ def fellowship_delete_event(fellowship_id, event_id):
     execute_db("DELETE FROM fellowship_events WHERE id=? AND fellowship_id=?", [event_id, fellowship_id])
     flash('Event removed.', 'info')
     return redirect(url_for('fellowship_events', fellowship_id=fellowship_id))
+
+
+# ─────────────────────────────────────────────
+# FELLOWSHIP TRANSFER REQUESTS
+# ─────────────────────────────────────────────
+
+@app.route('/fellowship/transfer/request', methods=['POST'])
+@login_required
+def fellowship_transfer_request():
+    """Member submits a transfer request"""
+    user = get_current_user()
+    member = query_db('SELECT * FROM members WHERE user_id=?', [user['id']], one=True)
+    if not member:
+        flash('No member profile found.', 'danger')
+        return redirect(url_for('member_portal'))
+    # Only one pending request allowed
+    existing = query_db(
+        "SELECT id FROM fellowship_transfer_requests WHERE member_id=? AND status='pending'",
+        [member['id']], one=True)
+    if existing:
+        flash('You already have a pending transfer request. Cancel it before submitting a new one.', 'warning')
+        return redirect(url_for('member_portal'))
+    to_id  = request.form.get('to_fellowship_id')
+    reason = request.form.get('reason', '').strip()
+    # Get current fellowship
+    current = query_db(
+        'SELECT fellowship_id FROM fellowship_members WHERE member_id=?',
+        [member['id']], one=True)
+    from_id = current['fellowship_id'] if current else None
+    if str(to_id) == str(from_id):
+        flash('You are already in that fellowship.', 'warning')
+        return redirect(url_for('member_portal'))
+    execute_db(
+        'INSERT INTO fellowship_transfer_requests (member_id, from_fellowship_id, to_fellowship_id, reason) VALUES (?,?,?,?)',
+        [member['id'], from_id, to_id, reason])
+    flash('Transfer request submitted! A leader or admin will review it shortly. 🙏', 'success')
+    return redirect(url_for('member_portal'))
+
+
+@app.route('/fellowship/transfer/<int:req_id>/cancel', methods=['POST'])
+@login_required
+def fellowship_transfer_cancel(req_id):
+    """Member cancels their own pending request"""
+    user = get_current_user()
+    member = query_db('SELECT * FROM members WHERE user_id=?', [user['id']], one=True)
+    req = query_db('SELECT * FROM fellowship_transfer_requests WHERE id=?', [req_id], one=True)
+    if not req or not member or req['member_id'] != member['id']:
+        flash('Request not found.', 'danger')
+        return redirect(url_for('member_portal'))
+    if req['status'] != 'pending':
+        flash('Only pending requests can be cancelled.', 'warning')
+        return redirect(url_for('member_portal'))
+    execute_db("UPDATE fellowship_transfer_requests SET status='cancelled' WHERE id=?", [req_id])
+    flash('Transfer request cancelled.', 'info')
+    return redirect(url_for('member_portal'))
+
+
+@app.route('/fellowship/transfer/<int:req_id>/approve', methods=['POST'])
+@login_required
+def fellowship_transfer_approve(req_id):
+    """Leader or admin approves a transfer request"""
+    if not is_super_admin():
+        # Check if user is a fellowship leader of the destination fellowship
+        user = get_current_user()
+        my = get_user_fellowship(user['id'])
+        req_check = query_db('SELECT * FROM fellowship_transfer_requests WHERE id=?', [req_id], one=True)
+        if not my or not req_check or my['id'] != req_check['to_fellowship_id'] or my['fm_role'] != 'leader':
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_index'))
+    req = query_db('SELECT * FROM fellowship_transfer_requests WHERE id=?', [req_id], one=True)
+    if not req or req['status'] != 'pending':
+        flash('Request not found or already processed.', 'warning')
+        return redirect(url_for('fellowship_transfer_list'))
+    # Move member: remove from old, add to new
+    execute_db('DELETE FROM fellowship_members WHERE member_id=?', [req['member_id']])
+    execute_db(
+        "INSERT OR REPLACE INTO fellowship_members (fellowship_id, member_id, role) VALUES (?,?,'member')",
+        [req['to_fellowship_id'], req['member_id']])
+    execute_db(
+        "UPDATE fellowship_transfer_requests SET status='approved', reviewed_by=?, reviewed_at=datetime('now') WHERE id=?",
+        [session['user_id'], req_id])
+    flash('Transfer approved! Member has been moved. ✅', 'success')
+    return redirect(url_for('fellowship_transfer_list'))
+
+
+@app.route('/fellowship/transfer/<int:req_id>/decline', methods=['POST'])
+@login_required
+def fellowship_transfer_decline(req_id):
+    """Leader or admin declines a transfer request"""
+    execute_db(
+        "UPDATE fellowship_transfer_requests SET status='declined', reviewed_by=?, reviewed_at=datetime('now') WHERE id=?",
+        [session['user_id'], req_id])
+    flash('Transfer request declined.', 'info')
+    return redirect(url_for('fellowship_transfer_list'))
+
+
+@app.route('/fellowship/transfers')
+@login_required
+def fellowship_transfer_list():
+    """Admin/leader view of all transfer requests"""
+    if is_super_admin():
+        requests = query_db("""SELECT ftr.*,
+            m.first_name||' '||m.last_name as member_name,
+            hf_from.name as from_name, hf_to.name as to_name,
+            u.first_name||' '||u.last_name as reviewer_name
+            FROM fellowship_transfer_requests ftr
+            JOIN members m ON ftr.member_id=m.id
+            LEFT JOIN house_fellowships hf_from ON ftr.from_fellowship_id=hf_from.id
+            LEFT JOIN house_fellowships hf_to ON ftr.to_fellowship_id=hf_to.id
+            LEFT JOIN users u ON ftr.reviewed_by=u.id
+            ORDER BY ftr.created_at DESC""")
+    else:
+        # Leader sees only requests for their fellowship
+        my = get_user_fellowship(session['user_id'])
+        if not my or my['fm_role'] != 'leader':
+            flash('Access denied.', 'danger')
+            return redirect(url_for('fellowship_index'))
+        requests = query_db("""SELECT ftr.*,
+            m.first_name||' '||m.last_name as member_name,
+            hf_from.name as from_name, hf_to.name as to_name,
+            u.first_name||' '||u.last_name as reviewer_name
+            FROM fellowship_transfer_requests ftr
+            JOIN members m ON ftr.member_id=m.id
+            LEFT JOIN house_fellowships hf_from ON ftr.from_fellowship_id=hf_from.id
+            LEFT JOIN house_fellowships hf_to ON ftr.to_fellowship_id=hf_to.id
+            LEFT JOIN users u ON ftr.reviewed_by=u.id
+            WHERE ftr.to_fellowship_id=?
+            ORDER BY ftr.created_at DESC""", [my['id']])
+    return render_template('fellowship_transfers.html', requests=requests)
 
 
 # ─────────── MAIN ───────────
