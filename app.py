@@ -46,6 +46,35 @@ def execute_db(query, args=()):
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+def send_notification_email(to_emails, subject, html_body):
+    """Send email via configured SMTP. Silently skips if SMTP not configured."""
+    try:
+        import smtplib
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+        db   = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
+        settings = db.execute("SELECT * FROM email_settings LIMIT 1").fetchone()
+        db.close()
+        if not settings or not settings['smtp_user'] or not settings['smtp_password']:
+            return False  # SMTP not configured — skip silently
+        for to_email in (to_emails if isinstance(to_emails, list) else [to_emails]):
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From']    = f"{settings['sender_name']} <{settings['smtp_user']}>"
+            msg['To']      = to_email
+            msg.attach(MIMEText(html_body, 'html'))
+            srv = smtplib.SMTP(settings['smtp_host'], settings['smtp_port'])
+            srv.ehlo(); srv.starttls(); srv.ehlo()
+            srv.login(settings['smtp_user'], settings['smtp_password'])
+            srv.sendmail(settings['smtp_user'], to_email, msg.as_string())
+            srv.quit()
+        return True
+    except Exception as e:
+        print(f"[Email] Failed to send: {e}")
+        return False
+
+
 def get_daily_verse():
     verses = query_db("SELECT * FROM prayer_verses WHERE is_active=1")
     if not verses:
@@ -65,6 +94,10 @@ def init_db():
             first_name TEXT NOT NULL,
             last_name TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'member',
+            signup_status TEXT DEFAULT 'approved',
+            pending_fellowship_id INTEGER,
+            phone TEXT,
+            reason_for_joining TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -603,6 +636,19 @@ def init_db():
         );
     ''')
 
+    # Migration: add new columns to users if they don't exist yet
+    for col, definition in [
+        ('signup_status',        "TEXT DEFAULT 'approved'"),
+        ('pending_fellowship_id','INTEGER'),
+        ('phone',                'TEXT'),
+        ('reason_for_joining',   'TEXT'),
+    ]:
+        try:
+            db.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            db.commit()
+        except Exception:
+            pass  # Column already exists
+
     # Seed 3 house fellowships
     if db.execute("SELECT COUNT(*) FROM house_fellowships").fetchone()[0] == 0:
         for name in [
@@ -859,22 +905,96 @@ def login():
 
 @app.route('/signup', methods=['GET','POST'])
 def signup():
+    fellowships = query_db("SELECT id, name FROM house_fellowships WHERE is_active=1 ORDER BY name")
     if request.method == 'POST':
-        email = request.form.get('email','').strip().lower()
-        first = request.form.get('first_name','').strip()
-        last  = request.form.get('last_name','').strip()
-        pw    = request.form.get('password','')
-        if not all([email,pw,first,last]):
-            flash('All fields required.','danger')
-            return render_template('signup.html')
+        email      = request.form.get('email','').strip().lower()
+        first      = request.form.get('first_name','').strip()
+        last       = request.form.get('last_name','').strip()
+        pw         = request.form.get('password','')
+        phone      = request.form.get('phone','').strip()
+        fellowship = request.form.get('fellowship_id','').strip()
+        reason     = request.form.get('reason_for_joining','').strip()
+
+        if not all([email, pw, first, last]):
+            flash('First name, last name, email and password are required.', 'danger')
+            return render_template('signup.html', fellowships=fellowships)
+        if len(pw) < 6:
+            flash('Password must be at least 6 characters.', 'danger')
+            return render_template('signup.html', fellowships=fellowships)
         if query_db("SELECT id FROM users WHERE email=?", [email], one=True):
-            flash('Email already registered.','danger')
-            return render_template('signup.html')
-        execute_db("INSERT INTO users (email,password_hash,first_name,last_name,role) VALUES (?,?,?,?,?)",
-            (email, hash_password(pw), first, last, 'member'))
-        flash('Account created! Please log in.','success')
+            flash('That email is already registered. Please log in.', 'danger')
+            return render_template('signup.html', fellowships=fellowships)
+
+        # Create user — active immediately
+        execute_db(
+            "INSERT INTO users (email,password_hash,first_name,last_name,role,"
+            "signup_status,pending_fellowship_id,phone,reason_for_joining) VALUES (?,?,?,?,?,?,?,?,?)",
+            (email, hash_password(pw), first, last, 'member',
+             'approved', fellowship or None, phone or None, reason or None))
+
+        # Create active member record right away
+        new_user = query_db("SELECT id FROM users WHERE email=?", [email], one=True)
+        execute_db(
+            "INSERT INTO members (first_name,last_name,email,phone,status,user_id) VALUES (?,?,?,?,?,?)",
+            (first, last, email, phone or None, 'active', new_user['id']))
+
+        new_member = query_db("SELECT id FROM members WHERE user_id=?", [new_user['id']], one=True)
+
+        # Fellowship: assign immediately if chosen
+        joined_fellowship = None
+        if fellowship:
+            joined_fellowship = query_db("SELECT * FROM house_fellowships WHERE id=?", [fellowship], one=True)
+            if joined_fellowship:
+                execute_db(
+                    "INSERT OR REPLACE INTO fellowship_members (fellowship_id, member_id, role) VALUES (?,?,'member')",
+                    [fellowship, new_member['id']])
+
+        # Notify super admins + fellowship leader by email
+        notify_emails = []
+        super_admins = query_db("SELECT email FROM users WHERE role='super_admin' AND email IS NOT NULL")
+        notify_emails += [u['email'] for u in super_admins]
+        if joined_fellowship:
+            leader = query_db("""SELECT u.email FROM users u
+                JOIN members m ON m.user_id=u.id
+                JOIN fellowship_members fm ON fm.member_id=m.id
+                WHERE fm.fellowship_id=? AND fm.role='leader' AND u.email IS NOT NULL""",
+                [fellowship], one=True)
+            if leader and leader['email'] not in notify_emails:
+                notify_emails.append(leader['email'])
+
+        if notify_emails:
+            app_url = request.host_url.rstrip('/')
+            fellowship_name = joined_fellowship['name'] if joined_fellowship else 'None selected'
+            email_html = f"""
+            <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;">
+              <div style="background:#1a2744;padding:24px 28px;border-radius:8px 8px 0 0;">
+                <h2 style="color:#c9a84c;margin:0;">✝ Champions Connect</h2>
+                <p style="color:rgba(255,255,255,.7);margin:4px 0 0;font-size:13px;">New Member Registration</p>
+              </div>
+              <div style="background:#fff;padding:28px;border:1px solid #e2e8f0;border-top:none;">
+                <h3 style="color:#1a2744;margin-top:0;">New member joined</h3>
+                <table style="width:100%;border-collapse:collapse;font-size:14px;">
+                  <tr><td style="padding:8px 0;color:#64748b;width:140px;">Name</td><td style="padding:8px 0;font-weight:700;">{first} {last}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b;">Email</td><td style="padding:8px 0;">{email}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b;">Phone</td><td style="padding:8px 0;">{phone or '—'}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b;">Fellowship</td><td style="padding:8px 0;">{fellowship_name}</td></tr>
+                </table>
+                <p style="color:#64748b;font-size:13px;margin-top:16px;">
+                  Member is active and can log in immediately.
+                </p>
+                <a href="{app_url}/admin/users" style="background:#1a2744;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none;font-weight:700;font-size:14px;display:inline-block;margin-top:8px;">
+                  View in Admin →
+                </a>
+              </div>
+              <div style="background:#f8f8f8;padding:14px 28px;border-radius:0 0 8px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-top:none;">
+                Champions Community Church · Edmonton, Alberta
+              </div>
+            </div>"""
+            send_notification_email(notify_emails, f"New member joined: {first} {last}", email_html)
+
+        flash(f'Welcome to Champions Connect, {first}! ✅ Log in below.', 'success')
         return redirect(url_for('login'))
-    return render_template('signup.html')
+    return render_template('signup.html', fellowships=fellowships)
 
 @app.route('/logout')
 def logout():
@@ -947,6 +1067,7 @@ def dashboard():
         my_total_given = 0
         this_year_given = 0
         my_fellowship = None
+        pending_fellowship_req = None
 
         if my_member:
             my_duties = query_db("""SELECT dr.* FROM duty_roster dr
@@ -964,6 +1085,13 @@ def dashboard():
             my_fellowship = query_db("""SELECT hf.*, fm.role as fm_role
                 FROM house_fellowships hf JOIN fellowship_members fm ON hf.id=fm.fellowship_id
                 WHERE fm.member_id=?""", [my_member['id']], one=True)
+            pending_fellowship_req = None
+            if not my_fellowship:
+                pending_fellowship_req = query_db("""SELECT ftr.*, hf.name as to_name
+                    FROM fellowship_transfer_requests ftr
+                    JOIN house_fellowships hf ON ftr.to_fellowship_id=hf.id
+                    WHERE ftr.member_id=? AND ftr.status='pending'
+                    ORDER BY ftr.created_at DESC LIMIT 1""", [my_member['id']], one=True)
 
         # Is this member a choir member?
         is_choir = my_member and query_db(
@@ -976,7 +1104,8 @@ def dashboard():
             my_donations=my_donations, my_total_given=my_total_given,
             this_year_given=this_year_given,
             pinned_news=pinned_news, daily_verse=daily_verse,
-            my_fellowship=my_fellowship, is_choir=is_choir,
+            my_fellowship=my_fellowship,
+        pending_fellowship_req=pending_fellowship_req, is_choir=is_choir,
             total_donations=0, upcoming_duties=[], recent_donations=[], member_breakdown=[])
 
 
@@ -2576,17 +2705,57 @@ def qb_sync_to_qb():
 @app.route('/admin/users')
 @super_admin_required
 def admin_users():
+    # Pending signups shown separately at the top
+    pending_signups = query_db("""SELECT u.*,
+        hf.name as requested_fellowship
+        FROM users u
+        LEFT JOIN house_fellowships hf ON u.pending_fellowship_id=hf.id
+        WHERE u.signup_status='pending'
+        ORDER BY u.created_at DESC""")
     users = query_db("""SELECT u.*,
         m.id as member_id, m.first_name as member_first, m.last_name as member_last,
         m.is_choir_member, m.voice_part
         FROM users u
         LEFT JOIN members m ON (m.user_id=u.id OR (m.user_id IS NULL AND m.email=u.email))
+        WHERE u.signup_status != 'pending'
         ORDER BY u.created_at DESC""")
     all_members = query_db("""SELECT m.id, m.first_name, m.last_name, m.email
         FROM members m WHERE m.user_id IS NULL
         ORDER BY m.last_name, m.first_name""")
     all_roles = ['super_admin','finance_admin','choir_admin','content_admin','events_admin','member']
-    return render_template('admin_users.html', users=users, all_roles=all_roles, all_members=all_members)
+    return render_template('admin_users.html', users=users, all_roles=all_roles,
+        all_members=all_members, pending_signups=pending_signups)
+
+@app.route('/admin/users/<int:user_id>/approve', methods=['POST'])
+@super_admin_required
+def approve_signup(user_id):
+    user = query_db("SELECT * FROM users WHERE id=?", [user_id], one=True)
+    if not user:
+        flash('User not found.', 'danger')
+        return redirect(url_for('admin_users'))
+    # Activate the user
+    execute_db("UPDATE users SET signup_status='approved' WHERE id=?", [user_id])
+    # Activate their member record
+    execute_db("UPDATE members SET status='active' WHERE user_id=?", [user_id])
+    # Assign to requested fellowship if one was chosen
+    if user['pending_fellowship_id']:
+        member = query_db("SELECT id FROM members WHERE user_id=?", [user_id], one=True)
+        if member:
+            execute_db(
+                "INSERT OR REPLACE INTO fellowship_members (fellowship_id, member_id, role) VALUES (?,?,'member')",
+                [user['pending_fellowship_id'], member['id']])
+    flash(f"{user['first_name']} {user['last_name']} approved and activated! ✅", 'success')
+    return redirect(url_for('admin_users'))
+
+
+@app.route('/admin/users/<int:user_id>/decline', methods=['POST'])
+@super_admin_required
+def decline_signup(user_id):
+    execute_db("UPDATE users SET signup_status='declined' WHERE id=?", [user_id])
+    execute_db("UPDATE members SET status='inactive' WHERE user_id=?", [user_id])
+    flash('Registration declined.', 'info')
+    return redirect(url_for('admin_users'))
+
 
 @app.route('/admin/users/<int:user_id>/link-member', methods=['POST'])
 @super_admin_required

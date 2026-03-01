@@ -5,14 +5,106 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sign Up · Champions Connect</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <style>
+    .fellowship-section {
+      display: none;
+      overflow: hidden;
+      animation: slideDown 0.35s ease;
+    }
+    .fellowship-section.visible {
+      display: block;
+    }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fellowship-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1.5px solid var(--ivory2);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.15s;
+      background: #fff;
+    }
+    .fellowship-option:hover {
+      border-color: var(--navy);
+      background: var(--ivory);
+    }
+    .fellowship-option input[type=radio] {
+      accent-color: var(--navy);
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+    }
+    .fellowship-option.selected {
+      border-color: var(--navy);
+      background: #eff6ff;
+    }
+    .fellowship-option label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--navy);
+      cursor: pointer;
+      margin: 0;
+      flex: 1;
+    }
+    .fellowship-option .meta {
+      font-size: 0.78rem;
+      color: var(--slate);
+      font-weight: 400;
+    }
+    .step-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0 16px;
+      color: var(--slate);
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .step-divider::before,
+    .step-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--ivory2);
+    }
+    .join-choice {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .join-btn {
+      flex: 1;
+      padding: 11px;
+      border: 1.5px solid var(--ivory2);
+      border-radius: 8px;
+      background: #fff;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--slate);
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .join-btn:hover { border-color: var(--navy); color: var(--navy); }
+    .join-btn.active-yes { border-color: var(--navy); background: var(--navy); color: #fff; }
+    .join-btn.active-no  { border-color: var(--slate); background: var(--ivory2); color: var(--slate); }
+  </style>
 </head>
 <body>
 <div class="auth-page">
-  <div class="auth-card">
+  <div class="auth-card" style="max-width:480px;">
     <div class="auth-logo">
-      <div class="circle">🎵</div>
-      <h2>Create Account</h2>
-      <p>Join Champions Connect Management System</p>
+      <div class="circle">✝</div>
+      <h2>Join Champions Connect</h2>
+      <p>Create your account to get started</p>
     </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -21,34 +113,131 @@
       {% endfor %}
     {% endwith %}
 
-    <form method="POST" action="{{ url_for('signup') }}">
+    <form method="POST" action="{{ url_for('signup') }}" id="signupForm">
+
+      <!-- ── Step 1: Basic details ── -->
       <div class="form-row">
         <div class="form-group">
-          <label>First Name</label>
-          <input type="text" name="first_name" placeholder="Grace" required>
+          <label>First Name *</label>
+          <input type="text" name="first_name" id="firstName" placeholder="Grace" required
+                 oninput="checkReveal()">
         </div>
         <div class="form-group">
-          <label>Last Name</label>
-          <input type="text" name="last_name" placeholder="Osei" required>
+          <label>Last Name *</label>
+          <input type="text" name="last_name" id="lastName" placeholder="Osei" required
+                 oninput="checkReveal()">
         </div>
       </div>
+
       <div class="form-group">
-        <label>Email Address</label>
-        <input type="email" name="email" placeholder="your@email.com" required>
+        <label>Email Address *</label>
+        <input type="email" name="email" id="emailField" placeholder="your@email.com" required
+               oninput="checkReveal()">
       </div>
+
       <div class="form-group">
-        <label>Password</label>
-        <input type="password" name="password" placeholder="Choose a password" required minlength="6">
+        <label>Phone Number</label>
+        <input type="tel" name="phone" placeholder="780-555-0100">
       </div>
-      <button type="submit" class="btn btn-primary w-100" style="margin-top:8px; padding:12px;">
+
+      <div class="form-group">
+        <label>Password *</label>
+        <input type="password" name="password" id="pwField" placeholder="Minimum 6 characters"
+               required minlength="6" oninput="checkReveal()">
+      </div>
+
+      <!-- ── Step 2: Fellowship (reveals after details filled) ── -->
+      <div class="fellowship-section" id="fellowshipSection">
+        <div class="step-divider">House Fellowship</div>
+
+        <p style="font-size:0.88rem;color:var(--slate);margin-bottom:14px;">
+          Would you like to join a House Fellowship?
+        </p>
+
+        <div class="join-choice">
+          <button type="button" class="join-btn" id="btnYes" onclick="showFellowships()">
+            🏠 Yes, join one
+          </button>
+          <button type="button" class="join-btn" id="btnNo" onclick="skipFellowship()">
+            Skip for now →
+          </button>
+        </div>
+
+        <div id="fellowshipList" style="display:none;">
+          {% if fellowships %}
+          {% for f in fellowships %}
+          <div class="fellowship-option" onclick="selectFellowship(this, '{{ f.id }}')">
+            <input type="radio" name="fellowship_id" value="{{ f.id }}" id="f{{ f.id }}">
+            <label for="f{{ f.id }}">
+              {{ f.name }}
+              {% if f.meeting_day or f.location %}
+              <div class="meta">
+                {% if f.meeting_day %}📅 {{ f.meeting_day }}{% if f.meeting_time %} at {{ f.meeting_time }}{% endif %}{% endif %}
+                {% if f.location %} · 📍 {{ f.location }}{% endif %}
+              </div>
+              {% endif %}
+            </label>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div style="font-size:0.85rem;color:var(--slate);padding:12px;background:var(--ivory2);border-radius:8px;">
+            No fellowships available yet. You can be assigned later.
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- hidden field to signal "skip" -->
+      <input type="hidden" name="fellowship_skipped" id="fellowshipSkipped" value="0">
+
+      <button type="submit" class="btn btn-primary w-100" id="submitBtn"
+              style="padding:13px;font-size:1rem;margin-top:18px;">
         Create Account →
       </button>
+
     </form>
 
-    <div class="auth-footer">
+    <div class="auth-footer" style="margin-top:18px;">
       Already have an account? <a href="{{ url_for('login') }}">Sign in</a>
     </div>
   </div>
 </div>
+
+<script>
+function checkReveal() {
+  const first = document.getElementById('firstName').value.trim();
+  const last  = document.getElementById('lastName').value.trim();
+  const email = document.getElementById('emailField').value.trim();
+  const pw    = document.getElementById('pwField').value;
+  const sec   = document.getElementById('fellowshipSection');
+
+  if (first && last && email && pw.length >= 6) {
+    sec.classList.add('visible');
+  }
+}
+
+function showFellowships() {
+  document.getElementById('fellowshipList').style.display = 'block';
+  document.getElementById('btnYes').classList.add('active-yes');
+  document.getElementById('btnNo').classList.remove('active-no');
+  document.getElementById('fellowshipSkipped').value = '0';
+}
+
+function skipFellowship() {
+  document.getElementById('fellowshipList').style.display = 'none';
+  document.getElementById('btnNo').classList.add('active-no');
+  document.getElementById('btnYes').classList.remove('active-yes');
+  document.getElementById('fellowshipSkipped').value = '1';
+  // Clear any selected fellowship
+  document.querySelectorAll('input[name=fellowship_id]').forEach(r => r.checked = false);
+  document.querySelectorAll('.fellowship-option').forEach(o => o.classList.remove('selected'));
+}
+
+function selectFellowship(el, id) {
+  document.querySelectorAll('.fellowship-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('f' + id).checked = true;
+}
+</script>
 </body>
 </html>
