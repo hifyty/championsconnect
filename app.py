@@ -46,6 +46,39 @@ def execute_db(query, args=()):
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
+def audit(action, target_type=None, target_id=None, target_name=None, detail=None):
+    """Write an entry to the audit log. Call after any significant action."""
+    try:
+        from flask import request as freq
+        uid   = session.get('user_id')
+        uname = session.get('name', 'Unknown')
+        ip    = freq.remote_addr
+        execute_db(
+            """INSERT INTO audit_log
+               (user_id, user_name, action, target_type, target_id, target_name, detail, ip_address)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            [uid, uname, action, target_type, target_id, target_name, detail, ip])
+    except Exception as e:
+        print(f"[Audit] Failed to log: {e}")
+
+
+def get_church_settings():
+    """Return church settings row, with safe defaults if not configured."""
+    db = sqlite3.connect(DATABASE)
+    db.row_factory = sqlite3.Row
+    row = db.execute("SELECT * FROM church_settings LIMIT 1").fetchone()
+    db.close()
+    if row:
+        return dict(row)
+    return {
+        'org_name':    'RCCG Champions Parish',
+        'org_address': '18811 111 Ave, Edmonton, Alberta',
+        'org_city':    'Edmonton, Alberta, Canada',
+        'cra_number':  '844574376 RR0001',
+        'admin_email': '', 'website': '', 'phone': ''
+    }
+
+
 def send_notification_email(to_emails, subject, html_body):
     """Send email via configured SMTP. Silently skips if SMTP not configured."""
     try:
@@ -108,6 +141,31 @@ def init_db():
             smtp_user TEXT,
             smtp_password TEXT,
             sender_name TEXT DEFAULT 'Champions Connect',
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            user_name TEXT,
+            action TEXT NOT NULL,
+            target_type TEXT,
+            target_id INTEGER,
+            target_name TEXT,
+            detail TEXT,
+            ip_address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS church_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            org_name TEXT DEFAULT 'RCCG Champions Parish',
+            org_address TEXT DEFAULT '18811 111 Ave, Edmonton, Alberta',
+            org_city TEXT DEFAULT 'Edmonton, Alberta, Canada',
+            cra_number TEXT DEFAULT '844574376 RR0001',
+            admin_email TEXT,
+            website TEXT,
+            phone TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -509,7 +567,12 @@ def init_db():
 
     # Email settings
     if db.execute("SELECT COUNT(*) FROM email_settings").fetchone()[0] == 0:
-        db.execute("INSERT INTO email_settings (smtp_host,smtp_port,sender_name) VALUES ('smtp.gmail.com',587,'Champions Connect')")
+        db.execute("INSERT INTO email_settings (smtp_host,smtp_port,sender_name) VALUES ('smtp.gmail.com',587,'RCCG Champions Parish')")
+
+    if db.execute("SELECT COUNT(*) FROM church_settings").fetchone()[0] == 0:
+        db.execute("""INSERT INTO church_settings
+            (org_name, org_address, org_city, cra_number)
+            VALUES ('RCCG Champions Parish','18811 111 Ave, Edmonton, Alberta','Edmonton, Alberta, Canada','844574376 RR0001')"""  )
 
     # SMS settings
     if db.execute("SELECT COUNT(*) FROM sms_settings").fetchone()[0] == 0:
@@ -635,6 +698,37 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
     ''')
+
+    # Migration: create audit_log if not exists (for existing databases)
+    try:
+        db.execute("""CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER, user_name TEXT, action TEXT NOT NULL,
+            target_type TEXT, target_id INTEGER, target_name TEXT,
+            detail TEXT, ip_address TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        db.commit()
+    except Exception:
+        pass
+
+    # Migration: create church_settings if not exists (for existing databases)
+    try:
+        db.execute("""CREATE TABLE IF NOT EXISTS church_settings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            org_name TEXT DEFAULT 'RCCG Champions Parish',
+            org_address TEXT DEFAULT '18811 111 Ave, Edmonton, Alberta',
+            org_city TEXT DEFAULT 'Edmonton, Alberta, Canada',
+            cra_number TEXT DEFAULT '844574376 RR0001',
+            admin_email TEXT, website TEXT, phone TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+        db.commit()
+        if db.execute("SELECT COUNT(*) FROM church_settings").fetchone()[0] == 0:
+            db.execute("""INSERT INTO church_settings (org_name,org_address,org_city,cra_number)
+                VALUES ('RCCG Champions Parish','18811 111 Ave, Edmonton, Alberta',
+                'Edmonton, Alberta, Canada','844574376 RR0001')""")
+            db.commit()
+    except Exception:
+        pass
 
     # Migration: add new columns to users if they don't exist yet
     for col, definition in [
@@ -899,6 +993,7 @@ def login():
                 [user['id'], user['email']], one=True)
             session['is_choir_member'] = choir_check is not None
             flash(f"Welcome back, {user['first_name']}! 🙌",'success')
+            audit('LOGIN', 'user', user['id'], f"{user['first_name']} {user['last_name']}")
             return redirect(url_for('dashboard'))
         flash('Invalid email or password.','danger')
     return render_template('login.html')
@@ -987,11 +1082,12 @@ def signup():
                 </a>
               </div>
               <div style="background:#f8f8f8;padding:14px 28px;border-radius:0 0 8px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-top:none;">
-                Champions Community Church · Edmonton, Alberta
+                {cs['org_name']} · {cs['org_city']}
               </div>
             </div>"""
             send_notification_email(notify_emails, f"New member joined: {first} {last}", email_html)
 
+        audit('USER_SIGNUP', 'user', new_user['id'], f'{first} {last}', f'Fellowship: {fellowship or "none"}')
         flash(f'Welcome to Champions Connect, {first}! ✅ Log in below.', 'success')
         return redirect(url_for('login'))
     return render_template('signup.html', fellowships=fellowships)
@@ -1145,6 +1241,7 @@ def add_member():
             request.form.get('emergency_contact_name'), request.form.get('emergency_contact_phone'),
             request.form.get('notes'), 1 if email else 0))
         flash('Member added and automatically added to the mailing list! ✅','success')
+        audit('MEMBER_ADDED', 'member', None, request.form.get('first_name','') + ' ' + request.form.get('last_name',''))
         return redirect(url_for('members'))
     return render_template('member_form.html', member=None)
 
@@ -1446,6 +1543,7 @@ def add_donation():
         request.form.get('donation_date') or date.today().isoformat(),
         request.form.get('payment_method','cash'), request.form.get('reference_number'),
         request.form.get('notes'), session.get('user_id')))
+    audit('DONATION_ADDED', 'donation', None, None, f"${request.form.get('amount','?')} recorded")
     flash('Donation recorded!','success'); return redirect(url_for('finance'))
 
 @app.route('/finance/donation/<int:donation_id>/edit', methods=['POST'])
@@ -1964,6 +2062,7 @@ def donation_receipt_pdf(member_id):
         COALESCE(SUM(amount),0) as yr_total, COUNT(*) as count
         FROM donations WHERE member_id=? GROUP BY yr ORDER BY yr DESC""", [member_id])
 
+    cs    = get_church_settings()
     NAVY  = colors.HexColor('#1a2744')
     GOLD  = colors.HexColor('#c9a84c')
     IVORY = colors.HexColor('#faf8f2')
@@ -1996,9 +2095,10 @@ def donation_receipt_pdf(member_id):
     story = []
 
     # ── Header ──
-    story.append(Paragraph('Champions Community Church', s_h1))
-    story.append(Paragraph('Edmonton, Alberta, Canada', s_sub))
-    story.append(Paragraph('CRA Charitable Registration No: 123456789 RR0001', s_sub))
+    story.append(Paragraph(cs['org_name'], s_h1))
+    story.append(Paragraph(cs['org_address'], s_sub))
+    story.append(Paragraph(cs['org_city'], s_sub))
+    story.append(Paragraph(f"CRA Charitable Registration No: {cs['cra_number']}", s_sub))
     story.append(Spacer(1, 0.12*inch))
     story.append(HRFlowable(width='100%', thickness=2, color=GOLD))
     story.append(Spacer(1, 0.08*inch))
@@ -2125,9 +2225,10 @@ def donation_receipt_pdf(member_id):
     story.append(HRFlowable(width='100%', thickness=1, color=GOLD))
     story.append(Spacer(1, 0.1*inch))
     story.append(Paragraph(
-        'This receipt is issued for Canadian income tax purposes. '
-        'Please retain for your records. '
-        'Champions Community Church is a registered Canadian charity.',
+        f"This receipt is issued for Canadian income tax purposes. "
+        f"Please retain for your records. "
+        f"{cs['org_name']} is a registered Canadian charity. "
+        f"CRA Registration: {cs['cra_number']}",
         s_foot))
 
     doc.build(story)
@@ -2787,6 +2888,7 @@ def auto_link_user_member(user_id):
 def set_user_role(user_id):
     new_role = request.form.get('role','member')
     execute_db("UPDATE users SET role=? WHERE id=?", [new_role, user_id])
+    audit('USER_ROLE_CHANGED', 'user', user_id, None, f'Role set to {new_role}')
     flash(f'Role updated to {new_role}.', 'success')
     return redirect(url_for('admin_users'))
 
@@ -2797,6 +2899,7 @@ def delete_user(user_id):
         flash("You can't delete yourself.", 'danger')
         return redirect(url_for('admin_users'))
     execute_db("DELETE FROM users WHERE id=?", [user_id])
+    audit('USER_DELETED', 'user', user_id)
     flash('User deleted.', 'info')
     return redirect(url_for('admin_users'))
 
@@ -3491,6 +3594,7 @@ def fellowship_change_role(fellowship_id, fm_id):
     new_role = request.form.get('role', 'member')
     execute_db("UPDATE fellowship_members SET role=? WHERE id=? AND fellowship_id=?",
         [new_role, fm_id, fellowship_id])
+    audit('FELLOWSHIP_ROLE_CHANGED', 'fellowship_member', None, None, f'Role changed')
     flash('Role updated!', 'success')
     return redirect(url_for('fellowship_detail', fellowship_id=fellowship_id))
 
@@ -3748,6 +3852,7 @@ def fellowship_transfer_approve(req_id):
     execute_db(
         "UPDATE fellowship_transfer_requests SET status='approved', reviewed_by=?, reviewed_at=datetime('now') WHERE id=?",
         [session['user_id'], req_id])
+    audit('FELLOWSHIP_TRANSFER_APPROVED', 'fellowship_transfer', req_id)
     flash('Transfer approved! Member has been moved. ✅', 'success')
     return redirect(url_for('fellowship_transfer_list'))
 
@@ -3796,6 +3901,92 @@ def fellowship_transfer_list():
             WHERE ftr.to_fellowship_id=?
             ORDER BY ftr.created_at DESC""", [my['id']])
     return render_template('fellowship_transfers.html', requests=requests)
+
+
+# ─────────────────────────────────────────────
+# CHURCH SETTINGS
+# ─────────────────────────────────────────────
+
+@app.route('/admin/settings', methods=['GET', 'POST'])
+@super_admin_required
+def church_settings_page():
+    if request.method == 'POST':
+        execute_db("""UPDATE church_settings SET
+            org_name=?, org_address=?, org_city=?, cra_number=?,
+            admin_email=?, website=?, phone=?, updated_at=datetime('now')
+            WHERE id=1""", [
+            request.form.get('org_name','').strip(),
+            request.form.get('org_address','').strip(),
+            request.form.get('org_city','').strip(),
+            request.form.get('cra_number','').strip(),
+            request.form.get('admin_email','').strip(),
+            request.form.get('website','').strip(),
+            request.form.get('phone','').strip(),
+        ])
+        audit('SETTINGS_UPDATED', 'church_settings')
+        flash('Church settings updated! ✅', 'success')
+        return redirect(url_for('church_settings_page'))
+    settings = get_church_settings()
+    return render_template('church_settings.html', settings=settings)
+
+
+@app.route('/admin/change-password', methods=['POST'])
+@super_admin_required
+def admin_change_own_password():
+    """Super admin changes their own password from the settings page"""
+    current = request.form.get('current_password', '')
+    new_pw  = request.form.get('new_password', '')
+    confirm = request.form.get('confirm_password', '')
+    user    = get_current_user()
+    if user['password_hash'] != hash_password(current):
+        flash('Current password is incorrect.', 'danger')
+    elif len(new_pw) < 6:
+        flash('New password must be at least 6 characters.', 'danger')
+    elif new_pw != confirm:
+        flash('New passwords do not match.', 'danger')
+    else:
+        execute_db("UPDATE users SET password_hash=? WHERE id=?",
+            [hash_password(new_pw), session['user_id']])
+        audit('PASSWORD_CHANGED', 'user', session.get('user_id'), 'Admin password change')
+        flash('Password updated successfully! ✅', 'success')
+    return redirect(url_for('church_settings_page'))
+
+
+# ─────────────────────────────────────────────
+# AUDIT LOG
+# ─────────────────────────────────────────────
+
+@app.route('/admin/audit')
+@super_admin_required
+def audit_log_page():
+    page     = int(request.args.get('page', 1))
+    per_page = 50
+    offset   = (page - 1) * per_page
+    action_filter = request.args.get('action', '')
+    user_filter   = request.args.get('user', '')
+
+    q      = "SELECT * FROM audit_log WHERE 1=1"
+    params = []
+    if action_filter:
+        q += " AND action=?"; params.append(action_filter)
+    if user_filter:
+        q += " AND (user_name LIKE ? OR CAST(user_id AS TEXT)=?)";
+        params += [f'%{user_filter}%', user_filter]
+
+    total  = query_db(f"SELECT COUNT(*) as c FROM audit_log WHERE 1=1" +
+        (" AND action=?" if action_filter else "") +
+        (" AND (user_name LIKE ? OR CAST(user_id AS TEXT)=?)" if user_filter else ""),
+        ([action_filter] if action_filter else []) + ([f'%{user_filter}%', user_filter] if user_filter else []),
+        one=True)['c']
+
+    logs   = query_db(q + " ORDER BY created_at DESC LIMIT ? OFFSET ?",
+        params + [per_page, offset])
+    actions = query_db("SELECT DISTINCT action FROM audit_log ORDER BY action")
+    pages  = (total + per_page - 1) // per_page
+
+    return render_template('audit_log.html', logs=logs, page=page, pages=pages,
+        total=total, action_filter=action_filter, user_filter=user_filter,
+        actions=actions)
 
 
 # ─────────── MAIN ───────────

@@ -47,7 +47,7 @@ a { text-decoration: none; color: inherit; }
 /* ── SIDEBAR ── */
 .sidebar {
   width: var(--sidebar-w);
-  min-height: 100vh;
+  height: 100vh;
   background: var(--navy);
   display: flex;
   flex-direction: column;
@@ -55,6 +55,7 @@ a { text-decoration: none; color: inherit; }
   top: 0; left: 0;
   z-index: 100;
   box-shadow: 2px 0 16px rgba(0,0,0,.18);
+  overflow: hidden;
 }
 
 .sidebar-logo {
@@ -88,7 +89,14 @@ a { text-decoration: none; color: inherit; }
 .sidebar-nav {
   padding: 16px 0;
   flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
+.sidebar-nav::-webkit-scrollbar { width: 4px; }
+.sidebar-nav::-webkit-scrollbar-track { background: transparent; }
+.sidebar-nav::-webkit-scrollbar-thumb { background: rgba(201,168,76,.3); border-radius: 4px; }
+.sidebar-nav::-webkit-scrollbar-thumb:hover { background: rgba(201,168,76,.6); }
 
 .nav-section-label {
   color: rgba(201,168,76,.6);
@@ -784,6 +792,10 @@ textarea { min-height: 100px; resize: vertical; }
 }
 
 .sidebar-overlay.open { display: block; }
+
+/* ── LOGOUT BUTTON ── */
+.topbar-btn-label { display: inline; }
+@media (max-width: 480px) { .topbar-btn-label { display: none; } }
 
 /* ── BOTTOM NAV (phone only) ── */
 .bottom-nav {

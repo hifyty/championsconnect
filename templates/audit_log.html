@@ -1,0 +1,107 @@
+{% extends 'base.html' %}
+{% block title %}Audit Log{% endblock %}
+{% block page_title %}🔍 Audit Log{% endblock %}
+
+{% block content %}
+
+<!-- Filters -->
+<form method="GET" class="search-bar" style="margin-bottom:16px;">
+  <select name="action" style="padding:9px 14px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.875rem;">
+    <option value="">All Actions</option>
+    {% for a in actions %}
+    <option value="{{ a.action }}" {% if a.action == action_filter %}selected{% endif %}>
+      {{ a.action.replace('_',' ').title() }}
+    </option>
+    {% endfor %}
+  </select>
+  <input class="search-input" type="text" name="user" placeholder="Filter by user name..."
+         value="{{ user_filter }}" style="max-width:220px;">
+  <button type="submit" class="btn btn-primary">Filter</button>
+  <a href="{{ url_for('audit_log_page') }}" class="btn btn-outline">Clear</a>
+  <span class="fs-sm text-slate" style="margin-left:8px;">{{ total }} total entries</span>
+</form>
+
+<!-- Log table -->
+<div class="card">
+  <div class="card-body" style="padding:0;">
+    {% if logs %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:150px;">When</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Target</th>
+            <th>Detail</th>
+            <th>IP</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+          <tr>
+            <td class="fs-sm text-slate" style="white-space:nowrap;">
+              {{ log.created_at[:16].replace('T',' ') if log.created_at else '—' }}
+            </td>
+            <td>
+              <span class="fw-bold fs-sm">{{ log.user_name or '—' }}</span>
+              {% if log.user_id %}
+              <div class="fs-sm text-slate">ID {{ log.user_id }}</div>
+              {% endif %}
+            </td>
+            <td>
+              {% set colour = {
+                'LOGIN':                    '#dbeafe',
+                'USER_SIGNUP':              '#dcfce7',
+                'DONATION_ADDED':           '#fef9c3',
+                'MEMBER_ADDED':             '#f0fdf4',
+                'USER_DELETED':             '#fee2e2',
+                'USER_ROLE_CHANGED':        '#ede9fe',
+                'FELLOWSHIP_TRANSFER_APPROVED': '#dcfce7',
+                'SETTINGS_UPDATED':         '#f1f5f9',
+                'PASSWORD_CHANGED':         '#fff7ed',
+              }.get(log.action, '#f1f5f9') %}
+              <span style="background:{{ colour }};padding:3px 8px;border-radius:5px;font-size:0.75rem;font-weight:700;white-space:nowrap;">
+                {{ log.action.replace('_',' ').title() }}
+              </span>
+            </td>
+            <td class="fs-sm">
+              {% if log.target_type %}
+              <span class="text-slate">{{ log.target_type | replace('_',' ') | title }}</span>
+              {% if log.target_name %}<br><strong>{{ log.target_name }}</strong>{% endif %}
+              {% if log.target_id %}<span class="text-slate"> #{{ log.target_id }}</span>{% endif %}
+              {% else %}—{% endif %}
+            </td>
+            <td class="fs-sm text-slate">{{ log.detail or '—' }}</td>
+            <td class="fs-sm text-slate" style="white-space:nowrap;">{{ log.ip_address or '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if pages > 1 %}
+    <div style="display:flex;align-items:center;justify-content:center;gap:8px;padding:16px;">
+      {% if page > 1 %}
+      <a href="?page={{ page-1 }}&action={{ action_filter }}&user={{ user_filter }}"
+         class="btn btn-sm btn-outline">← Prev</a>
+      {% endif %}
+      <span class="fs-sm text-slate">Page {{ page }} of {{ pages }}</span>
+      {% if page < pages %}
+      <a href="?page={{ page+1 }}&action={{ action_filter }}&user={{ user_filter }}"
+         class="btn btn-sm btn-outline">Next →</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="empty-state">
+      <div class="icon">🔍</div>
+      <p>No audit entries yet. Actions will appear here as the app is used.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

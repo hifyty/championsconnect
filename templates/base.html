@@ -109,6 +109,18 @@
     <a href="{{ url_for('fellowship_new') }}" class="nav-link {% if request.endpoint=='fellowship_new' %}active{% endif %}">
       <span class="nav-icon">➕</span> <span>New Fellowship</span>
     </a>
+    {% if session.get('role') == 'super_admin' %}
+    <div class="nav-section-label">⚙️ Admin</div>
+    <a href="{{ url_for('church_settings_page') }}" class="nav-link {% if request.endpoint=='church_settings_page' %}active{% endif %}">
+      <span class="nav-icon">🏛️</span> <span>Church Settings</span>
+    </a>
+    <a href="{{ url_for('admin_users') }}" class="nav-link {% if request.endpoint=='admin_users' %}active{% endif %}">
+      <span class="nav-icon">👑</span> <span>Users & Roles</span>
+    </a>
+    <a href="{{ url_for('audit_log_page') }}" class="nav-link {% if request.endpoint=='audit_log_page' %}active{% endif %}">
+      <span class="nav-icon">🔍</span> <span>Audit Log</span>
+    </a>
+    {% endif %}
     <a href="{{ url_for('fellowship_transfer_list') }}" class="nav-link {% if request.endpoint=='fellowship_transfer_list' %}active{% endif %}">
       <span class="nav-icon">↔</span> <span>Transfers</span>
     </a>
@@ -161,8 +173,14 @@
         <div class="topbar-date">{{ now.strftime('%A, %B %d, %Y') }}</div>
       </div>
     </div>
-    <div class="d-flex gap-1">
+    <div class="d-flex gap-1 align-center">
       {% block topbar_actions %}{% endblock %}
+      <a href="{{ url_for('logout') }}"
+         class="btn btn-sm btn-outline"
+         style="color:var(--slate);border-color:var(--ivory2);"
+         title="Log out">
+        <span class="topbar-btn-label">Log out</span> ⏻
+      </a>
     </div>
   </header>
 

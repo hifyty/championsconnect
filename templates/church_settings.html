@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% block title %}Church Settings{% endblock %}
+{% block page_title %}🏛️ Church Settings{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="align-items:start;">
+
+  <!-- LEFT: Church Details -->
+  <div>
+    <div class="card mb-2">
+      <div class="card-header"><div class="card-title">🏛️ Organisation Details</div></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('church_settings_page') }}">
+          <div class="form-group">
+            <label class="form-label">Church / Organisation Name *</label>
+            <input type="text" name="org_name" class="form-control"
+                   value="{{ settings.org_name or '' }}"
+                   placeholder="RCCG Champions Parish" required>
+            <div class="fs-sm text-slate" style="margin-top:4px;">Appears on PDF tax receipts and email headers.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Street Address</label>
+            <input type="text" name="org_address" class="form-control"
+                   value="{{ settings.org_address or '' }}"
+                   placeholder="18811 111 Ave, Edmonton, Alberta">
+          </div>
+          <div class="form-group">
+            <label class="form-label">City / Province / Country</label>
+            <input type="text" name="org_city" class="form-control"
+                   value="{{ settings.org_city or '' }}"
+                   placeholder="Edmonton, Alberta, Canada">
+          </div>
+          <div class="form-group">
+            <label class="form-label">CRA Charitable Registration Number</label>
+            <input type="text" name="cra_number" class="form-control"
+                   value="{{ settings.cra_number or '' }}"
+                   placeholder="844574376 RR0001">
+            <div class="fs-sm text-slate" style="margin-top:4px;">Printed on every official tax receipt PDF.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Admin Contact Email</label>
+            <input type="email" name="admin_email" class="form-control"
+                   value="{{ settings.admin_email or '' }}"
+                   placeholder="admin@church.ca">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Church Phone</label>
+            <input type="tel" name="phone" class="form-control"
+                   value="{{ settings.phone or '' }}"
+                   placeholder="780-555-0100">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Website</label>
+            <input type="url" name="website" class="form-control"
+                   value="{{ settings.website or '' }}"
+                   placeholder="https://www.champions.ca">
+          </div>
+          <button type="submit" class="btn btn-primary">Save Settings ✅</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Email Settings quick-link -->
+    <div class="card">
+      <div class="card-header"><div class="card-title">📧 Email (SMTP) Settings</div></div>
+      <div class="card-body">
+        <p class="fs-sm text-slate" style="margin-bottom:14px;">
+          Configure your SMTP credentials so the app can send new member notifications, mass emails, and duty reminders.
+        </p>
+        <div style="background:var(--ivory2);border-radius:8px;padding:14px;font-size:0.85rem;margin-bottom:14px;">
+          <strong>Gmail App Password — quickest setup:</strong><br>
+          1. Go to <a href="https://myaccount.google.com/security" target="_blank" style="color:var(--navy);">myaccount.google.com → Security</a><br>
+          2. Enable 2-Step Verification if not already on<br>
+          3. Search for <strong>App Passwords</strong><br>
+          4. Create one named "Champions Connect"<br>
+          5. Copy the 16-character password<br>
+          6. Enter your Gmail address + that password below
+        </div>
+        <a href="{{ url_for('email_blast') }}" class="btn btn-outline">⚙️ Open Email Settings →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Password + SSO info -->
+  <div>
+    <div class="card mb-2">
+      <div class="card-header"><div class="card-title">🔑 Change Admin Password</div></div>
+      <div class="card-body">
+        <form method="POST" action="{{ url_for('admin_change_own_password') }}">
+          <div class="form-group">
+            <label class="form-label">Current Password</label>
+            <input type="password" name="current_password" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">New Password</label>
+            <input type="password" name="new_password" class="form-control"
+                   minlength="6" required placeholder="Minimum 6 characters">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirm New Password</label>
+            <input type="password" name="confirm_password" class="form-control" required>
+          </div>
+          <button type="submit" class="btn btn-primary">Update Password</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-2">
+      <div class="card-header"><div class="card-title">🏠 House Fellowships</div></div>
+      <div class="card-body">
+        <p class="fs-sm text-slate" style="margin-bottom:14px;">
+          Add or manage house fellowships. Each fellowship can have a leader, meeting schedule, location, announcements, prayer requests, attendance, and events.
+        </p>
+        <a href="{{ url_for('fellowship_index') }}" class="btn btn-outline" style="margin-bottom:8px;">View All Fellowships</a>
+        <a href="{{ url_for('fellowship_new') }}" class="btn btn-gold">+ Add New Fellowship</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><div class="card-title">🔐 Single Sign-On (SSO)</div></div>
+      <div class="card-body">
+        <div style="background:var(--ivory2);border-radius:8px;padding:14px;font-size:0.85rem;">
+          <strong>Planned for a future release.</strong><br><br>
+          SSO will allow members to log in with Google or Microsoft — no password needed. When implemented, members click <em>"Sign in with Google"</em>, it matches their email to their member profile, and they're in automatically.<br><br>
+          <strong>What's needed to enable it:</strong>
+          <ul style="margin:8px 0 0 16px;line-height:1.8;">
+            <li>A Google Cloud project (free)</li>
+            <li>OAuth 2.0 credentials from Google</li>
+            <li>A custom domain (e.g. connect.champions.ca)</li>
+          </ul>
+          <br>
+          Raise this when you're ready and it can be added in one session.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
