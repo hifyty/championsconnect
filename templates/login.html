@@ -3,52 +3,394 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Login · Champions Connect</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <title>Sign In · Champions Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:  #1a2744;
+      --gold:  #c9a84c;
+      --gold2: #e8c96a;
+      --slate: #64748b;
+      --ivory: #faf8f2;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      display: flex;
+      background: var(--navy);
+    }
+
+    /* ── LEFT PANEL ── */
+    .left-panel {
+      flex: 1.1;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 52px 56px;
+      overflow: hidden;
+      background: var(--navy);
+    }
+
+    /* geometric background shapes */
+    .left-panel::before {
+      content: '';
+      position: absolute;
+      top: -120px; right: -120px;
+      width: 480px; height: 480px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(201,168,76,.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .left-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -80px; left: -80px;
+      width: 360px; height: 360px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(201,168,76,.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .left-top { position: relative; z-index: 1; }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 64px;
+    }
+
+    .brand-icon {
+      width: 48px; height: 48px;
+      background: var(--gold);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .brand-text {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.1rem;
+      color: #fff;
+      line-height: 1.2;
+    }
+
+    .brand-sub {
+      font-family: 'Inter', sans-serif;
+      font-size: 0.7rem;
+      letter-spacing: 2.5px;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-top: 2px;
+    }
+
+    .hero-text {
+      position: relative; z-index: 1;
+    }
+
+    .hero-text h1 {
+      font-family: 'Playfair Display', serif;
+      font-size: 2.8rem;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+      margin-bottom: 20px;
+    }
+
+    .hero-text h1 span { color: var(--gold); }
+
+    .hero-text p {
+      font-size: 1rem;
+      color: rgba(255,255,255,.55);
+      line-height: 1.7;
+      max-width: 380px;
+    }
+
+    .feature-list {
+      position: relative; z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 48px;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: rgba(255,255,255,.7);
+      font-size: 0.88rem;
+    }
+
+    .feature-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--gold);
+      flex-shrink: 0;
+    }
+
+    .left-bottom {
+      position: relative; z-index: 1;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,.25);
+      letter-spacing: 0.5px;
+    }
+
+    /* decorative cross */
+    .deco-cross {
+      position: absolute;
+      right: 56px; top: 50%;
+      transform: translateY(-50%);
+      opacity: 0.04;
+      z-index: 0;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .right-panel {
+      flex: 0 0 460px;
+      background: var(--ivory);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 52px;
+      position: relative;
+    }
+
+    .form-wrap { width: 100%; max-width: 360px; }
+
+    .form-wrap h2 {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.8rem;
+      color: var(--navy);
+      margin-bottom: 6px;
+    }
+
+    .form-wrap .subtitle {
+      font-size: 0.88rem;
+      color: var(--slate);
+      margin-bottom: 32px;
+    }
+
+    .flash {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+      font-weight: 500;
+    }
+    .flash-danger  { background: #fee2e2; color: #991b1b; }
+    .flash-warning { background: #fef9c3; color: #854d0e; }
+    .flash-success { background: #dcfce7; color: #166534; }
+    .flash-info    { background: #dbeafe; color: #1e40af; }
+
+    .form-group { margin-bottom: 18px; }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--navy);
+      letter-spacing: 0.3px;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+
+    input[type=email], input[type=password] {
+      width: 100%;
+      padding: 13px 16px;
+      border: 1.5px solid #dde3ec;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-family: 'Inter', sans-serif;
+      color: var(--navy);
+      background: #fff;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    input:focus {
+      border-color: var(--navy);
+      box-shadow: 0 0 0 3px rgba(26,39,68,.08);
+    }
+
+    .btn-signin {
+      width: 100%;
+      padding: 14px;
+      background: var(--navy);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      margin-top: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    .btn-signin:hover { background: #243560; }
+    .btn-signin:active { transform: scale(0.99); }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 22px 0;
+      color: #b0bac8;
+      font-size: 0.78rem;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e2e8f0;
+    }
+
+    .btn-google {
+      width: 100%;
+      padding: 12px;
+      background: #fff;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      font-family: 'Inter', sans-serif;
+      color: var(--slate);
+      cursor: not-allowed;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      opacity: 0.7;
+    }
+
+    .footer-link {
+      text-align: center;
+      margin-top: 24px;
+      font-size: 0.85rem;
+      color: var(--slate);
+    }
+
+    .footer-link a {
+      color: var(--navy);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    .footer-link a:hover { text-decoration: underline; }
+
+    /* ── MOBILE ── */
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+
+      .left-panel {
+        flex: none;
+        padding: 36px 28px 32px;
+      }
+
+      .left-panel::before, .left-panel::after { display: none; }
+      .deco-cross { display: none; }
+
+      .brand { margin-bottom: 28px; }
+
+      .hero-text h1 { font-size: 1.8rem; margin-bottom: 10px; }
+      .hero-text p  { font-size: 0.85rem; }
+      .feature-list { display: none; }
+      .left-bottom  { display: none; }
+
+      .right-panel {
+        flex: none;
+        padding: 36px 24px 48px;
+        border-radius: 24px 24px 0 0;
+        margin-top: -20px;
+        position: relative;
+        z-index: 2;
+      }
+
+      .form-wrap h2 { font-size: 1.5rem; }
+    }
+  </style>
 </head>
 <body>
-<div class="auth-page">
-  <div class="auth-card">
-    <div class="auth-logo">
-      <div class="circle">✝️</div>
-      <h2>Champions Connect</h2>
-      <p>RCCG Champions Parish · Edmonton</p>
+
+  <!-- LEFT: branded panel -->
+  <div class="left-panel">
+    <div class="left-top">
+      <div class="brand">
+        <div class="brand-icon">✝</div>
+        <div>
+          <div class="brand-text">Champions Connect</div>
+          <div class="brand-sub">RCCG Champions Parish</div>
+        </div>
+      </div>
+
+      <div class="hero-text">
+        <h1>Your church,<br><span>all in one place.</span></h1>
+        <p>Manage your fellowship, giving, events and more — built for the Champions Parish community.</p>
+
+        <div class="feature-list">
+          <div class="feature-item"><div class="feature-dot"></div>House fellowship management & prayer requests</div>
+          <div class="feature-item"><div class="feature-dot"></div>Personal giving history & CRA tax receipts</div>
+          <div class="feature-item"><div class="feature-dot"></div>Choir duties, rehearsals & song library</div>
+          <div class="feature-item"><div class="feature-dot"></div>Church events, news & announcements</div>
+        </div>
+      </div>
     </div>
 
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-      <div class="flash flash-{{ category }}" style="margin-bottom:14px;">{{ message }}</div>
-      {% endfor %}
-    {% endwith %}
+    <div class="left-bottom">
+      © {{ now.year }} RCCG Champions Parish · Edmonton, Alberta
+    </div>
 
-    <form method="POST" action="{{ url_for('login') }}">
-      <div class="form-group">
-        <label>Email Address</label>
-        <input type="email" name="email" placeholder="your@email.com" required autofocus>
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" name="password" placeholder="••••••••" required>
-      </div>
-      <button type="submit" class="btn btn-primary w-100" style="margin-top:8px; padding:12px;">
-        Sign In →
+    <!-- decorative cross -->
+    <svg class="deco-cross" width="320" height="320" viewBox="0 0 100 100" fill="white">
+      <rect x="42" y="5" width="16" height="90" rx="4"/>
+      <rect x="5" y="38" width="90" height="16" rx="4"/>
+    </svg>
+  </div>
+
+  <!-- RIGHT: login form -->
+  <div class="right-panel">
+    <div class="form-wrap">
+      <h2>Welcome back</h2>
+      <p class="subtitle">Sign in to your account to continue</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('login') }}">
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" name="email" placeholder="your@email.com" required autofocus>
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" name="password" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn-signin">Sign In →</button>
+      </form>
+
+      <div class="divider">or</div>
+
+      <button class="btn-google" disabled>
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Continue with Google (coming soon)
       </button>
-    </form>
 
-    <div style="position:relative; text-align:center; margin:22px 0;">
-      <hr style="border-color:var(--ivory2);">
-      <span style="position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:#fff;padding:0 12px;color:var(--slate);font-size:0.8rem;">or</span>
-    </div>
-
-    <button class="btn btn-outline w-100" style="padding:11px; justify-content:center; color:var(--slate); border-color:var(--ivory2);" disabled>
-      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.35-8.16 2.35-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-      &nbsp; Continue with Google (coming soon)
-    </button>
-
-    <div class="auth-footer">
-      New to Champions Connect? <a href="{{ url_for('signup') }}">Create an account</a>
+      <div class="footer-link">
+        New to Champions Connect? <a href="{{ url_for('signup') }}">Create an account</a>
+      </div>
     </div>
   </div>
-</div>
+
 </body>
 </html>
