@@ -3999,6 +3999,13 @@ def audit_log_page():
 
 # ─────────── MAIN ───────────
 
+# Always initialise the database — runs whether started by gunicorn (Render)
+# or directly with `python3 app.py` (local dev)
+try:
+    init_db()
+except Exception as e:
+    print(f"❌ Database init error: {e}"); raise
+
 if __name__ == '__main__':
     import socket
 
@@ -4007,15 +4014,10 @@ if __name__ == '__main__':
             return s.connect_ex(('127.0.0.1', port)) != 0
 
     PORT = 5000 if is_port_free(5000) else 5001
-    try:
-        init_db()
-    except Exception as e:
-        print(f"\n❌ Database error: {e}"); raise
 
     print("\n" + "="*50)
     print("  ✅ Champions Connect is running!")
     print(f"  🌐 Open: http://localhost:{PORT}")
-    print("  🔐 Login: admin@championschoir.ca / admin123")
     print("  Press Ctrl+C to stop")
     print("="*50 + "\n")
     app.run(debug=True, port=PORT, host='0.0.0.0')
