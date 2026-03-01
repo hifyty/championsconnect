@@ -159,6 +159,38 @@
 {% else %}
 <!-- MEMBER VIEW — personal info only -->
 
+{% if show_welcome %}
+<!-- First-login welcome — shown once only -->
+<div style="background:#fff;border:2px solid var(--gold);border-radius:var(--radius);padding:24px 28px;margin-bottom:20px;position:relative;">
+  <div style="font-size:1.5rem;margin-bottom:8px;">🎉</div>
+  <h3 style="color:var(--navy);margin:0 0 6px;">Welcome to Champions Connect{% if my_member %}, {{ my_member.first_name }}{% endif %}!</h3>
+  <p style="color:var(--slate);font-size:0.9rem;margin-bottom:16px;">
+    Your account is set up and ready. Here's what you can do right away:
+  </p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:0.85rem;">
+    <div style="background:var(--ivory2);border-radius:8px;padding:12px;">
+      <div style="font-weight:700;color:var(--navy);margin-bottom:4px;">👤 Your Profile</div>
+      <div style="color:var(--slate);">Go to <strong>My Portal</strong> to view your giving history, duties, and fellowship.</div>
+    </div>
+    <div style="background:var(--ivory2);border-radius:8px;padding:12px;">
+      <div style="font-weight:700;color:var(--navy);margin-bottom:4px;">🏠 House Fellowship</div>
+      <div style="color:var(--slate);">If you joined a fellowship at signup, you'll see it on your dashboard below.</div>
+    </div>
+    <div style="background:var(--ivory2);border-radius:8px;padding:12px;">
+      <div style="font-weight:700;color:var(--navy);margin-bottom:4px;">🎵 Choir Members</div>
+      <div style="color:var(--slate);">Your choir duties and schedule will appear here once the admin links your profile.</div>
+    </div>
+    <div style="background:var(--ivory2);border-radius:8px;padding:12px;">
+      <div style="font-weight:700;color:var(--navy);margin-bottom:4px;">💰 Giving History</div>
+      <div style="color:var(--slate);">Your donations appear automatically once the finance team maps them to your profile.</div>
+    </div>
+  </div>
+  <div style="margin-top:14px;font-size:0.8rem;color:var(--slate);">
+    This message won't show again. Questions? Contact your admin.
+  </div>
+</div>
+{% endif %}
+
 <!-- Welcome banner -->
 <div style="background:linear-gradient(135deg,var(--navy),#243560);border-radius:var(--radius);padding:22px 28px;margin-bottom:24px;color:#fff;">
   <div class="d-flex align-center justify-between" style="flex-wrap:wrap;gap:12px;">
@@ -260,6 +292,33 @@
   </div>
 
 </div>
+
+{% if my_fellowship %}
+<div class="card mt-2" style="border-left:4px solid var(--gold);">
+  <div class="card-header">
+    <div class="card-title">🏠 My House Fellowship</div>
+    <a href="{{ url_for('fellowship_detail', fellowship_id=my_fellowship.id) }}" class="btn btn-sm btn-outline">Open</a>
+  </div>
+  <div class="card-body">
+    <div style="font-weight:700;margin-bottom:4px;">{{ my_fellowship.name }}</div>
+    <div class="d-flex gap-1" style="flex-wrap:wrap;margin-top:6px;">
+      {% if my_fellowship.meeting_day %}<span class="badge badge-info">📅 {{ my_fellowship.meeting_day }}{% if my_fellowship.meeting_time %} at {{ my_fellowship.meeting_time }}{% endif %}</span>{% endif %}
+      {% if my_fellowship.location %}<span class="badge badge-scheduled">📍 {{ my_fellowship.location }}</span>{% endif %}
+      <span class="badge badge-{{ 'success' if my_fellowship.fm_role == 'leader' else 'info' }}">{{ '⭐ Leader' if my_fellowship.fm_role == 'leader' else '👤 Member' }}</span>
+    </div>
+  </div>
+</div>
+{% elif pending_fellowship_req %}
+<div class="card mt-2" style="border-left:4px solid var(--gold);">
+  <div class="card-header"><div class="card-title">🏠 My House Fellowship</div></div>
+  <div class="card-body" style="text-align:center;padding:20px;">
+    <div style="font-size:1.8rem;margin-bottom:8px;">⏳</div>
+    <div style="font-weight:700;margin-bottom:4px;">Fellowship Assignment Pending</div>
+    <div class="fs-sm text-slate">Requested: <strong>{{ pending_fellowship_req.to_name }}</strong></div>
+    <div class="fs-sm text-slate" style="margin-top:4px;">A leader or admin will confirm your assignment shortly.</div>
+  </div>
+</div>
+{% endif %}
 
 {% if daily_verse %}
 <div class="card mt-2" style="border-left:4px solid var(--gold);">

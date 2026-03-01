@@ -128,6 +128,7 @@ def init_db():
             last_name TEXT NOT NULL,
             role TEXT NOT NULL DEFAULT 'member',
             signup_status TEXT DEFAULT 'approved',
+            has_seen_welcome INTEGER DEFAULT 0,
             pending_fellowship_id INTEGER,
             phone TEXT,
             reason_for_joining TEXT,
@@ -732,6 +733,7 @@ def init_db():
 
     # Migration: add new columns to users if they don't exist yet
     for col, definition in [
+        ('has_seen_welcome',      'INTEGER DEFAULT 0'),
         ('signup_status',        "TEXT DEFAULT 'approved'"),
         ('pending_fellowship_id','INTEGER'),
         ('phone',                'TEXT'),
@@ -1194,8 +1196,14 @@ def dashboard():
             "SELECT id FROM choir_members WHERE member_id=? AND is_active=1",
             [my_member['id']], one=True) is not None if my_member else False
 
+        # First-login welcome flag
+        show_welcome = not get_current_user().get('has_seen_welcome', 1)
+        if show_welcome:
+            execute_db("UPDATE users SET has_seen_welcome=1 WHERE id=?", [session['user_id']])
+
         return render_template('dashboard.html',
             view='standard',
+            show_welcome=show_welcome,
             my_member=my_member, my_duties=my_duties,
             my_donations=my_donations, my_total_given=my_total_given,
             this_year_given=this_year_given,
