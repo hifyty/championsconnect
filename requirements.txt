@@ -6,6 +6,7 @@ gunicorn>=21.0,<22.0
 reportlab>=4.0,<5.0
 python-dotenv>=1.0,<2.0
 stripe>=10.0,<16.0
+psycopg2-binary>=2.9,<3.0
 
 # Optional — only needed if SMS reminders (Settings > SMS) are enabled.
 # The app already guards against this not being installed.

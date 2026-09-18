@@ -4,7 +4,7 @@ Built with Flask + SQLite
 """
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify, g
-import sqlite3, os, hashlib, secrets, smtplib
+import sqlite3, os, hashlib, secrets, smtplib, re
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime, date
@@ -28,11 +28,91 @@ DATABASE = os.path.join(os.path.dirname(__file__), 'church.db')
 # DATABASE HELPERS
 # ─────────────────────────────────────────────
 
+# ── Engine selection ────────────────────────────────────────────────
+# SQLite (default, zero setup) unless DATABASE_URL is set, in which case we
+# use Postgres -- e.g. a free Neon/Supabase database in production, since
+# Render's filesystem is wiped on every deploy and a local SQLite file
+# can't survive that.
+DATABASE_URL = os.environ.get('DATABASE_URL')
+USE_POSTGRES = bool(DATABASE_URL)
+
+if USE_POSTGRES:
+    import psycopg2
+    import psycopg2.extras
+
+
+def _adapt_sql(query):
+    """Rewrite the SQLite-only bits of a query so it also runs on Postgres,
+    and (only for Postgres) swap ? placeholders for %s. This is centralized
+    here so the ~150 queries elsewhere in this file never had to change.
+
+    SQLite-only pieces handled:
+      - strftime('%Y-%m', col) / strftime('%Y', col)  -> SUBSTR(col,1,7 or 4)
+      - strftime('%Y-%m','now') / strftime('%Y','now') -> a quoted literal
+      - date('now') / datetime('now')                  -> a quoted literal
+      - INSERT OR REPLACE / INSERT OR IGNORE            -> ON CONFLICT ... (two
+        specific known statements in this codebase; see below)
+
+    The SUBSTR()/quoted-literal rewrites are applied on *both* engines --
+    they're valid, correct SQLite too, so this is exercised by every
+    existing SQLite-based test rather than only running under Postgres.
+    """
+    if "strftime(" in query or "date('now')" in query or "datetime('now')" in query:
+        today = date.today()
+        query = query.replace("strftime('%Y-%m','now')", f"'{today:%Y-%m}'")
+        query = query.replace("strftime('%Y','now')", f"'{today:%Y}'")
+        query = re.sub(r"strftime\('%Y-%m',\s*([\w\.]+)\)", r"SUBSTR(\1,1,7)", query)
+        query = re.sub(r"strftime\('%Y',\s*([\w\.]+)\)", r"SUBSTR(\1,1,4)", query)
+        query = query.replace("date('now')", f"'{today.isoformat()}'")
+        query = query.replace("datetime('now')", f"'{datetime.now():%Y-%m-%d %H:%M:%S}'")
+
+    if USE_POSTGRES:
+        # SQLite upsert shorthand -> Postgres ON CONFLICT, before the ? -> %s
+        # swap below (matched against the original ? placeholders).
+        query = query.replace(
+            "INSERT OR REPLACE INTO fellowship_members (fellowship_id, member_id, role) VALUES (?,?,'member')",
+            "INSERT INTO fellowship_members (fellowship_id, member_id, role) VALUES (?,?,'member') "
+            "ON CONFLICT (member_id) DO UPDATE SET fellowship_id=EXCLUDED.fellowship_id, role=EXCLUDED.role")
+        query = query.replace(
+            "INSERT OR IGNORE INTO fellowship_attendance_records (session_id, member_id, status) VALUES (?,?,?)",
+            "INSERT INTO fellowship_attendance_records (session_id, member_id, status) VALUES (?,?,?) "
+            "ON CONFLICT (session_id, member_id) DO NOTHING")
+        # CREATE TABLE ... id INTEGER PRIMARY KEY AUTOINCREMENT -- covers both
+        # the big multi-statement schema scripts and the handful of
+        # standalone CREATE TABLE statements added later (qb_settings,
+        # audit_log, church_settings, etc.)
+        query = query.replace('INTEGER PRIMARY KEY AUTOINCREMENT', 'SERIAL PRIMARY KEY')
+        query = query.replace('?', '%s')
+
+    return query
+
+
+def _raw_connect():
+    """Open a fresh DB connection for the configured engine. Rows come back
+    as real dicts either way (sqlite3.Row supports dict()/['col'] access
+    already; psycopg2's RealDictCursor is the Postgres equivalent), since
+    the rest of this file uses row['col'] / dict(row) / row.get() patterns
+    throughout, not positional indexing."""
+    if USE_POSTGRES:
+        conn = psycopg2.connect(DATABASE_URL, cursor_factory=psycopg2.extras.RealDictCursor)
+        # Autocommit so one failed statement (e.g. an "ALTER TABLE ADD COLUMN"
+        # migration that already ran before) doesn't poison every statement
+        # after it for the rest of the connection the way a Postgres
+        # transaction normally would -- init_db() below relies on being able
+        # to keep going after an expected failure, the same way it already
+        # does under SQLite.
+        conn.autocommit = True
+        return conn
+    else:
+        conn = sqlite3.connect(DATABASE)
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
+
 def get_db():
     if 'db' not in g:
-        g.db = sqlite3.connect(DATABASE)
-        g.db.row_factory = sqlite3.Row
-        g.db.execute("PRAGMA foreign_keys = ON")
+        g.db = _raw_connect()
     return g.db
 
 @app.teardown_appcontext
@@ -42,15 +122,83 @@ def close_db(error):
         db.close()
 
 def query_db(query, args=(), one=False):
-    cur = get_db().execute(query, args)
-    rv = cur.fetchall()
+    query = _adapt_sql(query)
+    db = get_db()
+    if USE_POSTGRES:
+        cur = db.cursor()
+        cur.execute(query, args)
+        rv = cur.fetchall()
+        cur.close()
+    else:
+        cur = db.execute(query, args)
+        rv = cur.fetchall()
     return (rv[0] if rv else None) if one else rv
 
 def execute_db(query, args=()):
+    query = _adapt_sql(query)
     db = get_db()
-    cur = db.execute(query, args)
-    db.commit()
-    return cur
+    if USE_POSTGRES:
+        cur = db.cursor()
+        cur.execute(query, args)
+        return cur
+    else:
+        cur = db.execute(query, args)
+        db.commit()
+        return cur
+
+def execute_db_get_id(query, args=()):
+    """Like execute_db, but returns the new row's id. Needed because
+    psycopg2 cursors don't support sqlite3's cursor.lastrowid."""
+    if USE_POSTGRES:
+        query = _adapt_sql(query.rstrip().rstrip(';') + ' RETURNING id')
+        db = get_db()
+        cur = db.cursor()
+        cur.execute(query, args)
+        row = cur.fetchone()
+        cur.close()
+        return row['id'] if row else None
+    else:
+        return execute_db(query, args).lastrowid
+
+def _fetch_one_standalone(sql):
+    """Run a single no-param SELECT on a fresh connection outside of a
+    Flask request/app context (e.g. from a route that isn't login_required
+    but still needs settings), and return one row as a plain dict, or None."""
+    db = _raw_connect()
+    try:
+        if USE_POSTGRES:
+            cur = db.cursor()
+            cur.execute(sql)
+            row = cur.fetchone()
+            cur.close()
+        else:
+            row = db.execute(sql).fetchone()
+        return dict(row) if row else None
+    finally:
+        db.close()
+
+def _exec(db, sql, params=()):
+    """Engine-aware version of db.execute(), for the many raw db.execute()
+    calls in init_db() below (which uses its own connection, not get_db()).
+    Returns a cursor supporting .fetchone()/.fetchall() on both engines."""
+    sql = _adapt_sql(sql)
+    if USE_POSTGRES:
+        cur = db.cursor()
+        cur.execute(sql, params)
+        return cur
+    else:
+        return db.execute(sql, params)
+
+def _exec_script(db, sql):
+    """Engine-aware version of db.executescript() for the CREATE TABLE
+    blocks in init_db()."""
+    if USE_POSTGRES:
+        sql = _adapt_sql(sql)
+        cur = db.cursor()
+        cur.execute(sql)
+        cur.close()
+    else:
+        db.executescript(sql)
 
 # New feature modules live in blueprints/ instead of this file, so a bug in a
 # new module (giving, QuickBooks auto-sync, etc.) can't take down core routes
@@ -79,12 +227,9 @@ def audit(action, target_type=None, target_id=None, target_name=None, detail=Non
 
 def get_church_settings():
     """Return church settings row, with safe defaults if not configured."""
-    db = sqlite3.connect(DATABASE)
-    db.row_factory = sqlite3.Row
-    row = db.execute("SELECT * FROM church_settings LIMIT 1").fetchone()
-    db.close()
+    row = _fetch_one_standalone("SELECT * FROM church_settings LIMIT 1")
     if row:
-        return dict(row)
+        return row
     return {
         'org_name':    'RCCG Champions Parish',
         'org_address': '18811 111 Ave, Edmonton, Alberta',
@@ -100,10 +245,7 @@ def send_notification_email(to_emails, subject, html_body):
         import smtplib
         from email.mime.multipart import MIMEMultipart
         from email.mime.text import MIMEText
-        db   = sqlite3.connect(DATABASE)
-        db.row_factory = sqlite3.Row
-        settings = db.execute("SELECT * FROM email_settings LIMIT 1").fetchone()
-        db.close()
+        settings = _fetch_one_standalone("SELECT * FROM email_settings LIMIT 1")
         if not settings or not settings['smtp_user'] or not settings['smtp_password']:
             return False  # SMTP not configured — skip silently
         for to_email in (to_emails if isinstance(to_emails, list) else [to_emails]):
@@ -131,10 +273,8 @@ def get_daily_verse():
     return verses[day_index % len(verses)]
 
 def init_db():
-    db = sqlite3.connect(DATABASE)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys = ON")
-    db.executescript("""
+    db = _raw_connect()
+    _exec_script(db, """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT UNIQUE NOT NULL,
@@ -465,12 +605,12 @@ def init_db():
     """)
 
     # Admin user
-    if not db.execute("SELECT id FROM users WHERE email='admin@championschoir.ca'").fetchone():
-        db.execute("INSERT INTO users (email,password_hash,first_name,last_name,role) VALUES (?,?,?,?,?)",
+    if not _exec(db, "SELECT id FROM users WHERE email='admin@championschoir.ca'").fetchone():
+        _exec(db, "INSERT INTO users (email,password_hash,first_name,last_name,role) VALUES (?,?,?,?,?)",
             ('admin@championschoir.ca', hash_password('admin123'), 'Admin', 'User', 'admin'))
 
     # Finance categories
-    if db.execute("SELECT COUNT(*) FROM finance_categories").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM finance_categories").fetchone()['c'] == 0:
         for cat in [
             ('Tithes','Regular tithing','#6366f1'),
             ('Offerings','General offerings','#22c55e'),
@@ -479,10 +619,10 @@ def init_db():
             ('Fundraising','Fundraising proceeds','#ec4899'),
             ('Miscellaneous','Other','#94a3b8'),
         ]:
-            db.execute("INSERT INTO finance_categories (name,description,color) VALUES (?,?,?)", cat)
+            _exec(db, "INSERT INTO finance_categories (name,description,color) VALUES (?,?,?)", cat)
 
     # Members
-    if db.execute("SELECT COUNT(*) FROM members").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM members").fetchone()['c'] == 0:
         for m in [
             ('Grace','Osei','grace.osei@email.com','780-555-0101','Soprano','Lead','active','2021-01-15'),
             ('Emmanuel','Tetteh','etetteh@email.com','780-555-0102','Tenor','General','active','2020-06-01'),
@@ -493,12 +633,12 @@ def init_db():
             ('Efua','Amponsah','efua.a@email.com','780-555-0107','Alto','General','active','2023-01-22'),
             ('Nana','Owusu','nana.o@email.com','780-555-0108','Tenor','Lead','active','2018-09-30'),
         ]:
-            db.execute("""INSERT INTO members
+            _exec(db, """INSERT INTO members
                 (first_name,last_name,email,phone,voice_part,section,status,join_date,on_mailing_list)
                 VALUES (?,?,?,?,?,?,?,?,1)""", m)
 
     # Duties
-    if db.execute("SELECT COUNT(*) FROM duty_roster").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM duty_roster").fetchone()['c'] == 0:
         for d in [
             (1,'Worship Leader','2025-02-16','Sunday Service'),
             (2,'Keyboard','2025-02-16','Sunday Service'),
@@ -509,10 +649,10 @@ def init_db():
             (7,'Keyboard','2025-02-23','Sunday Service'),
             (8,'Announcements','2025-02-23','Sunday Service'),
         ]:
-            db.execute("INSERT INTO duty_roster (member_id,duty_type,scheduled_date,service_type) VALUES (?,?,?,?)", d)
+            _exec(db, "INSERT INTO duty_roster (member_id,duty_type,scheduled_date,service_type) VALUES (?,?,?,?)", d)
 
     # Donations
-    if db.execute("SELECT COUNT(*) FROM donations").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM donations").fetchone()['c'] == 0:
         for d in [
             (1,None,250.00,1,'2025-01-05','e-transfer'),
             (2,None,100.00,2,'2025-01-05','cash'),
@@ -522,10 +662,10 @@ def init_db():
             (None,'Anonymous Donor',500.00,3,'2025-01-26','cash'),
             (1,None,250.00,1,'2025-02-02','e-transfer'),
         ]:
-            db.execute("INSERT INTO donations (member_id,donor_name,amount,category_id,donation_date,payment_method) VALUES (?,?,?,?,?,?)", d)
+            _exec(db, "INSERT INTO donations (member_id,donor_name,amount,category_id,donation_date,payment_method) VALUES (?,?,?,?,?,?)", d)
 
     # News posts
-    if db.execute("SELECT COUNT(*) FROM news_posts").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM news_posts").fetchone()['c'] == 0:
         for post in [
             ('Welcome to Champions Connect! 🎉',
              'We are thrilled to launch our new church management platform. Champions Connect brings our community closer together — track events, duties, donations and more all in one place. To God be the glory!',
@@ -537,10 +677,10 @@ def init_db():
              'Glory to God! Our recent fundraising concert raised over $3,200 for our building renovation fund. Thank you to everyone who contributed and attended. God bless you all abundantly!',
              'praise_report', 1, 0),
         ]:
-            db.execute("INSERT INTO news_posts (title,body,category,is_published,pinned) VALUES (?,?,?,?,?)", post)
+            _exec(db, "INSERT INTO news_posts (title,body,category,is_published,pinned) VALUES (?,?,?,?,?)", post)
 
     # Prayer verses
-    if db.execute("SELECT COUNT(*) FROM prayer_verses").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM prayer_verses").fetchone()['c'] == 0:
         verses = [
             ('Philippians 4:13','I can do all things through Christ who strengthens me.'),
             ('Psalm 46:1','God is our refuge and strength, an ever-present help in trouble.'),
@@ -556,11 +696,11 @@ def init_db():
             ('Ephesians 5:19','Speaking to one another with psalms, hymns, and songs from the Spirit. Sing and make music from your heart to the Lord.'),
         ]
         for v in verses:
-            db.execute("INSERT INTO prayer_verses (reference,verse_text,is_active) VALUES (?,?,1)", v)
+            _exec(db, "INSERT INTO prayer_verses (reference,verse_text,is_active) VALUES (?,?,1)", v)
 
     # Scripture of month
-    if db.execute("SELECT COUNT(*) FROM scripture_month").fetchone()[0] == 0:
-        db.execute("INSERT INTO scripture_month (month_year,reference,scripture_text,theme) VALUES (?,?,?,?)", (
+    if _exec(db, "SELECT COUNT(*) as c FROM scripture_month").fetchone()['c'] == 0:
+        _exec(db, "INSERT INTO scripture_month (month_year,reference,scripture_text,theme) VALUES (?,?,?,?)", (
             datetime.now().strftime('%Y-%m'),
             'Psalm 100:1-2',
             'Shout for joy to the Lord, all the earth. Worship the Lord with gladness; come before him with joyful songs.',
@@ -568,16 +708,16 @@ def init_db():
 
 
     # Rehearsals seed
-    if db.execute("SELECT COUNT(*) FROM rehearsals").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM rehearsals").fetchone()['c'] == 0:
         for r in [
             ('Weekly Choir Practice','2025-02-15','10:00','12:00','Main Hall','Bring sheet music for Sunday service'),
             ('Weekly Choir Practice','2025-02-22','10:00','12:00','Main Hall','Focus on praise section'),
             ('Special Rehearsal — Easter Prep','2025-03-01','09:00','13:00','Main Hall','Full run-through of Easter program'),
         ]:
-            db.execute("INSERT INTO rehearsals (title,rehearsal_date,start_time,end_time,location,notes) VALUES (?,?,?,?,?,?)", r)
+            _exec(db, "INSERT INTO rehearsals (title,rehearsal_date,start_time,end_time,location,notes) VALUES (?,?,?,?,?,?)", r)
 
     # Songs seed
-    if db.execute("SELECT COUNT(*) FROM songs").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM songs").fetchone()['c'] == 0:
         for s in [
             ('Way Maker','Sinach','G','Medium','Gospel','https://youtube.com/watch?v=iom5tMCWFpA','Key change at bridge'),
             ('Goodness of God','Bethel Music','A','Slow','Contemporary Worship',None,'Beautiful for offering time'),
@@ -586,24 +726,24 @@ def init_db():
             ('The Blessing','Elevation Worship','G','Slow','Contemporary Worship','https://youtube.com/watch?v=DXDH9GnpKGs','4-part harmony'),
             ('Joyful Joyful','Traditional','Bb','Upbeat','Hymn',None,'Christmas and special occasions'),
         ]:
-            db.execute("INSERT INTO songs (title,artist,key_signature,tempo,genre,youtube_url,lyrics_notes) VALUES (?,?,?,?,?,?,?)", s)
+            _exec(db, "INSERT INTO songs (title,artist,key_signature,tempo,genre,youtube_url,lyrics_notes) VALUES (?,?,?,?,?,?,?)", s)
 
     # Email settings
-    if db.execute("SELECT COUNT(*) FROM email_settings").fetchone()[0] == 0:
-        db.execute("INSERT INTO email_settings (smtp_host,smtp_port,sender_name) VALUES ('smtp.gmail.com',587,'RCCG Champions Parish')")
+    if _exec(db, "SELECT COUNT(*) as c FROM email_settings").fetchone()['c'] == 0:
+        _exec(db, "INSERT INTO email_settings (smtp_host,smtp_port,sender_name) VALUES ('smtp.gmail.com',587,'RCCG Champions Parish')")
 
-    if db.execute("SELECT COUNT(*) FROM church_settings").fetchone()[0] == 0:
-        db.execute("""INSERT INTO church_settings
+    if _exec(db, "SELECT COUNT(*) as c FROM church_settings").fetchone()['c'] == 0:
+        _exec(db, """INSERT INTO church_settings
             (org_name, org_address, org_city, cra_number)
             VALUES ('RCCG Champions Parish','18811 111 Ave, Edmonton, Alberta','Edmonton, Alberta, Canada','844574376 RR0001')"""  )
 
     # SMS settings
-    if db.execute("SELECT COUNT(*) FROM sms_settings").fetchone()[0] == 0:
-        db.execute("INSERT INTO sms_settings (twilio_account_sid,twilio_auth_token,twilio_phone_number,is_enabled) VALUES (NULL,NULL,NULL,0)")
+    if _exec(db, "SELECT COUNT(*) as c FROM sms_settings").fetchone()['c'] == 0:
+        _exec(db, "INSERT INTO sms_settings (twilio_account_sid,twilio_auth_token,twilio_phone_number,is_enabled) VALUES (NULL,NULL,NULL,0)")
 
     # QuickBooks settings
     try:
-        db.execute("""CREATE TABLE IF NOT EXISTS qb_settings (
+        _exec(db, """CREATE TABLE IF NOT EXISTS qb_settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             client_id TEXT,
             client_secret TEXT,
@@ -617,7 +757,7 @@ def init_db():
             last_sync_at TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""")
-        db.execute("""CREATE TABLE IF NOT EXISTS qb_sync_log (
+        _exec(db, """CREATE TABLE IF NOT EXISTS qb_sync_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sync_type TEXT NOT NULL,
             direction TEXT NOT NULL,
@@ -627,20 +767,20 @@ def init_db():
             notes TEXT,
             synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )""")
-        db.execute("""ALTER TABLE members ADD COLUMN qb_customer_id TEXT""")
-        db.execute("""ALTER TABLE donations ADD COLUMN qb_transaction_id TEXT""")
-        db.execute("""ALTER TABLE expenses ADD COLUMN qb_expense_id TEXT""")
+        _exec(db, """ALTER TABLE members ADD COLUMN qb_customer_id TEXT""")
+        _exec(db, """ALTER TABLE donations ADD COLUMN qb_transaction_id TEXT""")
+        _exec(db, """ALTER TABLE expenses ADD COLUMN qb_expense_id TEXT""")
     except Exception:
         pass
-    if db.execute("SELECT COUNT(*) FROM qb_settings").fetchone()[0] == 0:
-        db.execute("INSERT INTO qb_settings (client_id,client_secret,is_connected) VALUES (NULL,NULL,0)")
+    if _exec(db, "SELECT COUNT(*) as c FROM qb_settings").fetchone()['c'] == 0:
+        _exec(db, "INSERT INTO qb_settings (client_id,client_secret,is_connected) VALUES (NULL,NULL,0)")
 
     # Migrate legacy roles
-    db.execute("UPDATE users SET role='super_admin' WHERE role='admin'")
-    db.execute("UPDATE users SET role='finance_admin' WHERE role='finance'")
+    _exec(db, "UPDATE users SET role='super_admin' WHERE role='admin'")
+    _exec(db, "UPDATE users SET role='finance_admin' WHERE role='finance'")
 
     # House Fellowship tables
-    db.executescript("""
+    _exec_script(db, """
         CREATE TABLE IF NOT EXISTS house_fellowships (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL UNIQUE,
@@ -708,7 +848,7 @@ def init_db():
     """)
 
     # Fellowship transfer requests table
-    db.executescript('''
+    _exec_script(db, '''
         CREATE TABLE IF NOT EXISTS fellowship_transfer_requests (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
@@ -724,7 +864,7 @@ def init_db():
 
     # Migration: create audit_log if not exists (for existing databases)
     try:
-        db.execute("""CREATE TABLE IF NOT EXISTS audit_log (
+        _exec(db, """CREATE TABLE IF NOT EXISTS audit_log (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER, user_name TEXT, action TEXT NOT NULL,
             target_type TEXT, target_id INTEGER, target_name TEXT,
@@ -736,7 +876,7 @@ def init_db():
 
     # Migration: create church_settings if not exists (for existing databases)
     try:
-        db.execute("""CREATE TABLE IF NOT EXISTS church_settings (
+        _exec(db, """CREATE TABLE IF NOT EXISTS church_settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             org_name TEXT DEFAULT 'RCCG Champions Parish',
             org_address TEXT DEFAULT '18811 111 Ave, Edmonton, Alberta',
@@ -745,8 +885,8 @@ def init_db():
             admin_email TEXT, website TEXT, phone TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
         db.commit()
-        if db.execute("SELECT COUNT(*) FROM church_settings").fetchone()[0] == 0:
-            db.execute("""INSERT INTO church_settings (org_name,org_address,org_city,cra_number)
+        if _exec(db, "SELECT COUNT(*) as c FROM church_settings").fetchone()['c'] == 0:
+            _exec(db, """INSERT INTO church_settings (org_name,org_address,org_city,cra_number)
                 VALUES ('RCCG Champions Parish','18811 111 Ave, Edmonton, Alberta',
                 'Edmonton, Alberta, Canada','844574376 RR0001')""")
             db.commit()
@@ -762,22 +902,22 @@ def init_db():
         ('reason_for_joining',   'TEXT'),
     ]:
         try:
-            db.execute(f"ALTER TABLE users ADD COLUMN {col} {definition}")
+            _exec(db, f"ALTER TABLE users ADD COLUMN {col} {definition}")
             db.commit()
         except Exception:
             pass  # Column already exists
 
     # Seed 3 house fellowships
-    if db.execute("SELECT COUNT(*) FROM house_fellowships").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM house_fellowships").fetchone()['c'] == 0:
         for name in [
             'Champions Westerners House Fellowship',
             'Champions Northside House Fellowship',
             'Champions Southside House Fellowship',
         ]:
-            db.execute("INSERT INTO house_fellowships (name) VALUES (?)", (name,))
+            _exec(db, "INSERT INTO house_fellowships (name) VALUES (?)", (name,))
 
     # Q&A tables
-    db.executescript("""
+    _exec_script(db, """
         CREATE TABLE IF NOT EXISTS qa_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
@@ -810,16 +950,16 @@ def init_db():
     """)
 
     # Social settings stubs
-    if db.execute("SELECT COUNT(*) FROM social_settings").fetchone()[0] == 0:
+    if _exec(db, "SELECT COUNT(*) as c FROM social_settings").fetchone()['c'] == 0:
         for platform in ['facebook','instagram']:
-            db.execute("INSERT INTO social_settings (platform,is_enabled) VALUES (?,0)", (platform,))
+            _exec(db, "INSERT INTO social_settings (platform,is_enabled) VALUES (?,0)", (platform,))
 
     # Choir membership — add existing members who have voice_part set
-    if db.execute("SELECT COUNT(*) FROM choir_members").fetchone()[0] == 0:
-        members_with_voice = db.execute("SELECT id,voice_part,section,join_date FROM members WHERE voice_part IS NOT NULL AND voice_part != ''").fetchall()
+    if _exec(db, "SELECT COUNT(*) as c FROM choir_members").fetchone()['c'] == 0:
+        members_with_voice = _exec(db, "SELECT id,voice_part,section,join_date FROM members WHERE voice_part IS NOT NULL AND voice_part != ''").fetchall()
         for m in members_with_voice:
             try:
-                db.execute("INSERT INTO choir_members (member_id,voice_part,section,join_date,is_active) VALUES (?,?,?,?,1)",
+                _exec(db, "INSERT INTO choir_members (member_id,voice_part,section,join_date,is_active) VALUES (?,?,?,?,1)",
                     (m['id'], m['voice_part'], m['section'] or 'General', m['join_date']))
             except Exception:
                 pass
@@ -831,15 +971,15 @@ def init_db():
         "ALTER TABLE news_posts ADD COLUMN likes_count INTEGER DEFAULT 0",
         "ALTER TABLE news_posts ADD COLUMN comments_count INTEGER DEFAULT 0",
     ]:
-        try: db.execute(col_sql)
+        try: _exec(db, col_sql)
         except Exception: pass
 
     # Sync is_choir_member flag
-    db.execute("UPDATE members SET is_choir_member=1 WHERE id IN (SELECT member_id FROM choir_members WHERE is_active=1)")
+    _exec(db, "UPDATE members SET is_choir_member=1 WHERE id IN (SELECT member_id FROM choir_members WHERE is_active=1)")
 
     # Add flyer_filename column to existing events tables (migration safety)
     try:
-        db.execute("ALTER TABLE events ADD COLUMN flyer_filename TEXT")
+        _exec(db, "ALTER TABLE events ADD COLUMN flyer_filename TEXT")
     except Exception:
         pass
 
@@ -1788,13 +1928,11 @@ def record_service_attendance():
     service_type = request.form.get('service_type', 'Sunday Service')
     member_ids   = request.form.getlist('member_ids')
     statuses     = request.form.getlist('statuses')
-    db = get_db()
     for mid, stat in zip(member_ids, statuses):
-        db.execute("""INSERT INTO service_attendance (service_date,service_type,member_id,status,recorded_by)
+        execute_db("""INSERT INTO service_attendance (service_date,service_type,member_id,status,recorded_by)
             VALUES (?,?,?,?,?)
             ON CONFLICT(service_date,member_id) DO UPDATE SET status=excluded.status""",
             (service_date, service_type, mid, stat, session.get('user_id')))
-    db.commit()
     flash(f'Attendance recorded for {len(member_ids)} members!', 'success')
     return redirect(url_for('attendance'))
 
@@ -1806,14 +1944,12 @@ def quick_service_attendance():
     service_type  = request.form.get('service_type', 'Sunday Service')
     present_ids   = set(request.form.getlist('present'))
     all_members   = query_db("SELECT id FROM members WHERE status='active'")
-    db = get_db()
     for m in all_members:
         stat = 'present' if str(m['id']) in present_ids else 'absent'
-        db.execute("""INSERT INTO service_attendance (service_date,service_type,member_id,status,recorded_by)
+        execute_db("""INSERT INTO service_attendance (service_date,service_type,member_id,status,recorded_by)
             VALUES (?,?,?,?,?)
             ON CONFLICT(service_date,member_id) DO UPDATE SET status=excluded.status""",
             (service_date, service_type, m['id'], stat, session.get('user_id')))
-    db.commit()
     flash(f'Service attendance saved!', 'success')
     return redirect(url_for('attendance'))
 
@@ -1837,14 +1973,12 @@ def add_rehearsal():
 def mark_rehearsal_attendance(rehearsal_id):
     present_ids = set(request.form.getlist('present'))
     all_members = query_db("SELECT id FROM members WHERE status='active'")
-    db = get_db()
     for m in all_members:
         stat = 'present' if str(m['id']) in present_ids else 'absent'
-        db.execute("""INSERT INTO rehearsal_attendance (rehearsal_id,member_id,status)
+        execute_db("""INSERT INTO rehearsal_attendance (rehearsal_id,member_id,status)
             VALUES (?,?,?)
             ON CONFLICT(rehearsal_id,member_id) DO UPDATE SET status=excluded.status""",
             (rehearsal_id, m['id'], stat))
-    db.commit()
     flash('Rehearsal attendance saved!', 'success')
     return redirect(url_for('attendance'))
 
@@ -3751,10 +3885,9 @@ def fellowship_attendance_new(fellowship_id):
     session_date = request.form.get('session_date', date.today().isoformat())
     session_type = request.form.get('session_type', 'Regular Meeting')
     notes        = request.form.get('notes', '')
-    cur = execute_db("""INSERT INTO fellowship_attendance_sessions
+    sess_id = execute_db_get_id("""INSERT INTO fellowship_attendance_sessions
         (fellowship_id, session_date, session_type, notes, created_by) VALUES (?,?,?,?,?)""",
         (fellowship_id, session_date, session_type, notes, session['user_id']))
-    sess_id = cur.lastrowid
     # Record statuses for each member
     members = query_db("SELECT member_id FROM fellowship_members WHERE fellowship_id=?", [fellowship_id])
     for m in members:
