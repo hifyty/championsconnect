@@ -10,8 +10,17 @@ from email.mime.text import MIMEText
 from datetime import datetime, date
 from functools import wraps
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # loads .env in local dev; no-op if the file doesn't exist
+except ImportError:
+    pass
+
 app = Flask(__name__)
-app.secret_key = secrets.token_hex(32)
+# SECRET_KEY should be set in the environment (.env locally, Render env vars
+# in production) so sessions survive restarts/redeploys and stay consistent
+# across gunicorn workers. Falls back to a random key (old behavior) if unset.
+app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 DATABASE = os.path.join(os.path.dirname(__file__), 'church.db')
 
 
@@ -42,6 +51,12 @@ def execute_db(query, args=()):
     cur = db.execute(query, args)
     db.commit()
     return cur
+
+# New feature modules live in blueprints/ instead of this file, so a bug in a
+# new module (giving, QuickBooks auto-sync, etc.) can't take down core routes
+# the way one dropped line in this file once broke every login page.
+from blueprints.giving import giving_bp
+app.register_blueprint(giving_bp)
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
