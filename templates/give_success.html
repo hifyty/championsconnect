@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Thank You{% endblock %}
+{% block page_title %}Thank You{% endblock %}
+
+{% block content %}
+<div style="max-width:480px;">
+  <div class="card">
+    <div class="card-body" style="text-align:center; padding:40px 24px;">
+      <div style="font-size:2.5rem;">🙏</div>
+      <h3 style="margin:12px 0 8px;">Thank you for your generosity!</h3>
+      <p class="text-slate">Your gift has been received and will appear in your giving history shortly.</p>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-gold" style="margin-top:16px;">Back to Dashboard</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

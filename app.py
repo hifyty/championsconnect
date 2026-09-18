@@ -341,6 +341,13 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS stripe_donors (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            member_id INTEGER NOT NULL REFERENCES members(id) ON DELETE CASCADE,
+            stripe_customer_id TEXT UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             category_id INTEGER REFERENCES finance_categories(id),
@@ -1212,7 +1219,11 @@ def dashboard():
             [my_member['id']], one=True) is not None if my_member else False
 
         # First-login welcome flag
-        show_welcome = not get_current_user().get('has_seen_welcome', 1)
+        # sqlite3.Row has no .get() -- calling it here crashed every member's
+        # dashboard load (AttributeError). Use dict() so a missing/None value
+        # falls back safely instead of raising.
+        _current_user_row = get_current_user()
+        show_welcome = not dict(_current_user_row).get('has_seen_welcome', 1) if _current_user_row else False
         if show_welcome:
             execute_db("UPDATE users SET has_seen_welcome=1 WHERE id=?", [session['user_id']])
 

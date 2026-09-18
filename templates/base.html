@@ -75,6 +75,9 @@
     <a href="{{ url_for('finance') }}" class="nav-link {% if request.endpoint in ['finance','finance_import'] %}active{% endif %}">
       <span class="nav-icon">💰</span> <span>{% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}Donations & Finance{% else %}My Giving{% endif %}</span>
     </a>
+    <a href="{{ url_for('giving.give_page') }}" class="nav-link {% if request.endpoint=='giving.give_page' %}active{% endif %}">
+      <span class="nav-icon">💳</span> <span>Give Online</span>
+    </a>
     {% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}
     <a href="{{ url_for('quickbooks') }}" class="nav-link {% if 'quickbooks' in request.endpoint %}active{% endif %}">
       <span class="nav-icon">📊</span> <span>QuickBooks Sync</span>
