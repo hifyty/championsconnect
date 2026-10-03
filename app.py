@@ -406,6 +406,17 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
+        CREATE TABLE IF NOT EXISTS news_posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            category TEXT DEFAULT 'announcement',
+            is_published INTEGER DEFAULT 1,
+            pinned INTEGER DEFAULT 0,
+            created_by INTEGER REFERENCES users(id),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
         -- BLOG POST LIKES
         CREATE TABLE IF NOT EXISTS post_likes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -498,17 +509,6 @@ def init_db():
             receipt_number TEXT,
             approved_by INTEGER REFERENCES users(id),
             notes TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS news_posts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            body TEXT NOT NULL,
-            category TEXT DEFAULT 'announcement',
-            is_published INTEGER DEFAULT 1,
-            pinned INTEGER DEFAULT 0,
-            created_by INTEGER REFERENCES users(id),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
