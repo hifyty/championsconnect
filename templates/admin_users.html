@@ -25,7 +25,7 @@
         <tr {% if u.id == session.get('user_id') %}style="background:#fffbeb;"{% endif %}>
           <td>
             <div class="fw-bold">{{ u.first_name or u.email.split('@')[0] }} {{ u.last_name or '' }}</div>
-            <div class="fs-sm text-slate">Joined {{ u.created_at[:10] if u.created_at else '—' }}</div>
+            <div class="fs-sm text-slate">Joined {{ (u.created_at|string)[:10] if u.created_at else '—' }}</div>
           </td>
           <td class="fs-sm">{{ u.email }}</td>
           <td>

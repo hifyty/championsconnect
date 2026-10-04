@@ -20,7 +20,7 @@
         {% if post.pinned %}
         <span class="badge badge-active">📌 Pinned</span>
         {% endif %}
-        <span class="fs-sm text-slate">{{ post.created_at[:10] if post.created_at else '' }}</span>
+        <span class="fs-sm text-slate">{{ (post.created_at|string)[:10] if post.created_at else '' }}</span>
         {% if post.first_name %}
         <span class="fs-sm text-slate">by {{ post.first_name }} {{ post.last_name }}</span>
         {% endif %}
@@ -101,7 +101,7 @@
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
               <span class="fw-bold fs-sm">{{ c.first_name }} {{ c.last_name }}</span>
               <div style="display:flex;align-items:center;gap:8px;">
-                <span class="fs-sm text-slate">{{ c.created_at[:10] if c.created_at else '' }}</span>
+                <span class="fs-sm text-slate">{{ (c.created_at|string)[:10] if c.created_at else '' }}</span>
                 {% if c.user_id == session.get('user_id') or session.get('role') in ['super_admin','admin','content_admin'] %}
                 <form method="POST" action="{{ url_for('delete_comment', post_id=post.id, comment_id=c.id) }}"
                       onsubmit="return confirm('Delete this comment?');">

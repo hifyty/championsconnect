@@ -41,7 +41,7 @@
         <tr>
           <td>
             <div class="fw-bold">{{ s.title }}</div>
-            <div class="fs-sm text-slate">{{ s.description or '' }} · {{ s.created_at[:10] }}</div>
+            <div class="fs-sm text-slate">{{ s.description or '' }} · {{ (s.created_at|string)[:10] }}</div>
           </td>
           <td>
             <div style="display:flex;align-items:center;gap:8px;">

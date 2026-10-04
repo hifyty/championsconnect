@@ -14,7 +14,7 @@
         <div style="font-size:1rem;font-weight:700;color:var(--success);">✅ Connected to QuickBooks</div>
         <div class="fs-sm text-slate">Company: <strong>{{ settings.company_name or 'Unknown' }}</strong></div>
         {% if settings.last_sync_at %}
-        <div class="fs-sm text-slate">Last sync: {{ settings.last_sync_at[:16] }}</div>
+        <div class="fs-sm text-slate">Last sync: {{ (settings.last_sync_at|string)[:16] }}</div>
         {% endif %}
         {% else %}
         <div style="font-size:1rem;font-weight:700;color:var(--warning);">⚠️ Not Connected</div>
@@ -172,7 +172,7 @@
       <tbody>
         {% for log in sync_log %}
         <tr>
-          <td class="fs-sm">{{ log.synced_at[:16] if log.synced_at else '—' }}</td>
+          <td class="fs-sm">{{ (log.synced_at|string)[:16] if log.synced_at else '—' }}</td>
           <td class="fw-bold fs-sm">{{ log.sync_type|replace('_',' ')|title }}</td>
           <td>
             <span class="badge" style="background:{% if 'qb_to' in log.direction %}#eff6ff;color:#1e40af;{% else %}#f0fdf4;color:#166534;{% endif %}">

@@ -41,7 +41,7 @@
           {% for log in logs %}
           <tr>
             <td class="fs-sm text-slate" style="white-space:nowrap;">
-              {{ log.created_at[:16].replace('T',' ') if log.created_at else '—' }}
+              {{ (log.created_at|string)[:16].replace('T',' ') if log.created_at else '—' }}
             </td>
             <td>
               <span class="fw-bold fs-sm">{{ log.user_name or '—' }}</span>

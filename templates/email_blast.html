@@ -167,7 +167,7 @@
             <div style="flex:1;">
               <div class="fw-bold" style="font-size:0.9rem;">{{ b.subject }}</div>
               <div class="fs-sm text-slate">
-                {{ b.sent_at[:16] if b.sent_at else '—' }} ·
+                {{ (b.sent_at|string)[:16] if b.sent_at else '—' }} ·
                 {{ b.recipient_count }} recipients ·
                 {{ b.first_name or 'System' }} {{ b.last_name or '' }}
               </div>

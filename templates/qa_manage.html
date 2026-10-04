@@ -88,7 +88,7 @@
         </div>
         <div style="margin-top:5px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <span class="fs-sm text-slate">{{ q.submitter_name }}</span>
-          <span class="fs-sm text-slate">· {{ q.created_at[11:16] if q.created_at else '' }}</span>
+          <span class="fs-sm text-slate">· {{ (q.created_at|string)[11:16] if q.created_at else '' }}</span>
           {% if q.is_featured %}<span class="badge" style="background:#fef3c7;color:#92400e;font-size:0.68rem;">⭐ Featured</span>{% endif %}
           {% if q.is_answered %}<span class="badge badge-active" style="font-size:0.68rem;">✅ Answered</span>{% endif %}
           {% if q.status == 'hidden' %}<span class="badge badge-inactive" style="font-size:0.68rem;">🚫 Hidden</span>{% endif %}

@@ -86,7 +86,7 @@
               {% if post.category == 'announcement' %}📢{% elif post.category == 'event' %}📅{% elif post.category == 'praise_report' %}🙌{% else %}📝{% endif %}
               {{ post.category|replace('_',' ')|title }}
             </span>
-            <span style="color:var(--slate);font-size:0.78rem;">{{ post.created_at[:10] if post.created_at else '' }}</span>
+            <span style="color:var(--slate);font-size:0.78rem;">{{ (post.created_at|string)[:10] if post.created_at else '' }}</span>
             {% if post.first_name %}
             <span style="color:var(--slate);font-size:0.78rem;">by {{ post.first_name }} {{ post.last_name }}</span>
             {% endif %}
@@ -143,7 +143,7 @@
           <span style="font-size:0.72rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:{% if sp.platform=='facebook' %}#1877f2{% else %}#c13584{% endif %};">
             {% if sp.platform == 'facebook' %}📘 Facebook{% else %}📸 Instagram{% endif %}
           </span>
-          <span class="fs-sm text-slate">· {{ sp.posted_at[:10] if sp.posted_at else '' }}</span>
+          <span class="fs-sm text-slate">· {{ (sp.posted_at|string)[:10] if sp.posted_at else '' }}</span>
         </div>
         {% if sp.message %}
         <p style="font-size:0.82rem;color:var(--slate);line-height:1.6;margin:0 0 8px;">

@@ -58,7 +58,7 @@
             <td><span class="badge badge-{{ 'info' if a.activity_type == 'New User' else 'success' }}">{{ a.activity_type }}</span></td>
             <td><strong>{{ a.name }}</strong></td>
             <td class="fs-sm text-slate">{{ a.detail or '—' }}</td>
-            <td class="fs-sm text-slate">{{ a.created_at[:10] if a.created_at else '—' }}</td>
+            <td class="fs-sm text-slate">{{ (a.created_at|string)[:10] if a.created_at else '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -85,7 +85,7 @@
             <td><strong>{{ u.first_name }} {{ u.last_name }}</strong></td>
             <td class="fs-sm">{{ u.email }}</td>
             <td><span class="badge badge-{{ 'success' if u.role == 'super_admin' else 'info' if u.role != 'member' else 'scheduled' }}">{{ u.role | replace('_', ' ') | title }}</span></td>
-            <td class="fs-sm text-slate">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+            <td class="fs-sm text-slate">{{ (u.created_at|string)[:10] if u.created_at else '—' }}</td>
           </tr>
           {% endfor %}
         </tbody>

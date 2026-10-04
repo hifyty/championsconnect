@@ -84,7 +84,7 @@
       <div style="padding:14px 18px;border-bottom:1px solid var(--border);">
         <div style="font-weight:600;font-size:0.9rem;">{{ a.title }}</div>
         <div class="fs-sm text-slate" style="margin-top:4px;">{{ a.body[:120] }}{% if a.body|length > 120 %}…{% endif %}</div>
-        <div class="fs-sm text-slate" style="margin-top:6px;">{{ a.author }} · {{ a.created_at[:10] }}</div>
+        <div class="fs-sm text-slate" style="margin-top:6px;">{{ a.author }} · {{ (a.created_at|string)[:10] }}</div>
       </div>
       {% endfor %}
       {% else %}
@@ -108,7 +108,7 @@
       {% for p in prayer_requests %}
       <div style="padding:12px 18px;border-bottom:1px solid var(--border);">
         <div class="fs-sm">{{ p.request_text[:100] }}{% if p.request_text|length > 100 %}…{% endif %}</div>
-        <div class="fs-sm text-slate" style="margin-top:4px;">— {{ p.submitter_name or 'Anonymous' }} · {{ p.created_at[:10] }}</div>
+        <div class="fs-sm text-slate" style="margin-top:4px;">— {{ p.submitter_name or 'Anonymous' }} · {{ (p.created_at|string)[:10] }}</div>
       </div>
       {% endfor %}
       {% else %}

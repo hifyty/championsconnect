@@ -33,7 +33,7 @@
               {{ r.status | title }}
             </span>
           </td>
-          <td class="fs-sm text-slate">{{ r.created_at[:10] if r.created_at else '—' }}</td>
+          <td class="fs-sm text-slate">{{ (r.created_at|string)[:10] if r.created_at else '—' }}</td>
           <td>
             {% if r.status == 'pending' %}
             <div class="d-flex gap-1">
