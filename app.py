@@ -61,8 +61,17 @@ def _adapt_sql(query):
         today = date.today()
         query = query.replace("strftime('%Y-%m','now')", f"'{today:%Y-%m}'")
         query = query.replace("strftime('%Y','now')", f"'{today:%Y}'")
-        query = re.sub(r"strftime\('%Y-%m',\s*([\w\.]+)\)", r"SUBSTR(\1,1,7)", query)
-        query = re.sub(r"strftime\('%Y',\s*([\w\.]+)\)", r"SUBSTR(\1,1,4)", query)
+        # members.created_at is a real TIMESTAMP column on Postgres (unlike
+        # donation_date/event_date/scheduled_date, which are TEXT). Postgres
+        # has no SUBSTR(timestamp,...) overload, so cast to ::text first --
+        # but only on the Postgres branch, since ::text is Postgres-only
+        # syntax and would break SQLite.
+        if USE_POSTGRES:
+            query = re.sub(r"strftime\('%Y-%m',\s*([\w\.]+)\)", r"SUBSTR(\1::text,1,7)", query)
+            query = re.sub(r"strftime\('%Y',\s*([\w\.]+)\)", r"SUBSTR(\1::text,1,4)", query)
+        else:
+            query = re.sub(r"strftime\('%Y-%m',\s*([\w\.]+)\)", r"SUBSTR(\1,1,7)", query)
+            query = re.sub(r"strftime\('%Y',\s*([\w\.]+)\)", r"SUBSTR(\1,1,4)", query)
         query = query.replace("date('now')", f"'{today.isoformat()}'")
         query = query.replace("datetime('now')", f"'{datetime.now():%Y-%m-%d %H:%M:%S}'")
 
