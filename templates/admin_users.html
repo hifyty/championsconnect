@@ -50,7 +50,8 @@
             <span class="badge {% if u.role == 'super_admin' %}badge-active{% elif 'admin' in (u.role or '') %}badge-scheduled{% else %}badge-inactive{% endif %}"
                   style="font-size:0.78rem;">
               {{ {'super_admin':'👑 Super Admin','finance_admin':'💰 Finance Admin','choir_admin':'🎵 Choir Admin',
-                  'content_admin':'📰 Content Admin','events_admin':'📅 Events Admin','member':'👤 Member'}.get(u.role, u.role or 'member') }}
+                  'content_admin':'📰 Content Admin','events_admin':'📅 Events Admin','children_admin':'🧒 Children\'s Admin',
+                  'member':'👤 Member'}.get(u.role, u.role or 'member') }}
             </span>
           </td>
           <td>
@@ -61,7 +62,8 @@
                 <option value="{{ role }}" {% if u.role == role %}selected{% endif %}>
                   {{ {'super_admin':'👑 Super Admin','finance_admin':'💰 Finance Admin',
                       'choir_admin':'🎵 Choir Admin','content_admin':'📰 Content Admin',
-                      'events_admin':'📅 Events Admin','member':'👤 Member'}.get(role, role) }}
+                      'events_admin':'📅 Events Admin','children_admin':'🧒 Children\'s Admin',
+                      'member':'👤 Member'}.get(role, role) }}
                 </option>
                 {% endfor %}
               </select>

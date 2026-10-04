@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% block title %}{{ cls.name }}{% endblock %}
+{% block page_title %}🏫 {{ cls.name }}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('children_index') }}" class="btn btn-outline">← All Classes</a>
+<a href="{{ url_for('add_child') }}" class="btn btn-gold">+ Add Child</a>
+{% endblock %}
+
+{% block content %}
+
+{% if cls.age_range or cls.leader_name %}
+<p class="text-slate fs-sm mb-2">
+  {% if cls.age_range %}Ages {{ cls.age_range }}{% endif %}
+  {% if cls.age_range and cls.leader_name %} &middot; {% endif %}
+  {% if cls.leader_name %}Leader: {{ cls.leader_name }}{% endif %}
+</p>
+{% endif %}
+
+{% if roster %}
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">👥 Today's Roster</div>
+  </div>
+  <div class="card-body" style="padding:0;">
+    <table>
+      <thead>
+        <tr>
+          <th>Child</th>
+          <th>Status</th>
+          <th>Dropped off / Picked up by</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for child in roster %}
+        {% set ci = checkins_by_child.get(child.id) %}
+        <tr>
+          <td>
+            <a href="{{ url_for('child_detail', child_id=child.id) }}" style="text-decoration:none;color:inherit;">
+              <strong>{{ child.first_name }} {{ child.last_name }}</strong>
+            </a>
+            {% if child.allergy_notes %}
+            <div class="fs-sm" style="color:#b91c1c;">⚠️ {{ child.allergy_notes }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if not ci %}
+            <span class="badge badge-inactive">Not checked in</span>
+            {% elif not ci.checked_out_at %}
+            <span class="badge badge-active">✅ Checked in</span>
+            {% else %}
+            <span class="badge badge-scheduled">👋 Picked up</span>
+            {% endif %}
+          </td>
+          <td class="fs-sm text-slate">
+            {% if ci and ci.checked_out_at %}
+              {% if ci.notes %}
+                <span style="color:#b91c1c;">{{ ci.notes }}</span>
+              {% else %}
+                Picked up by guardian
+              {% endif %}
+            {% elif ci %}
+              Pickup code: <strong>{{ ci.pickup_code }}</strong>
+            {% else %}
+              &mdash;
+            {% endif %}
+          </td>
+          <td>
+            {% if not ci %}
+            <form method="POST" action="{{ url_for('children_checkin', class_id=cls.id) }}" style="display:flex;gap:6px;">
+              <input type="hidden" name="child_id" value="{{ child.id }}">
+              <select name="dropoff_guardian_id" style="padding:5px 8px;border:1.5px solid var(--ivory2);border-radius:6px;font-size:0.8rem;">
+                <option value="">Dropped off by...</option>
+                {% for g in guardians_by_child.get(child.id, []) %}
+                <option value="{{ g.id }}">{{ g.first_name }} {{ g.last_name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-xs btn-gold">Check In</button>
+            </form>
+            {% elif not ci.checked_out_at %}
+            <button class="btn btn-xs btn-outline" onclick="openModal('checkout-{{ ci.id }}')">Check Out</button>
+
+            <div class="modal-overlay" id="checkout-{{ ci.id }}">
+              <div class="modal">
+                <div class="modal-header">
+                  <div class="modal-title">👋 Check Out {{ child.first_name }}</div>
+                  <button class="modal-close" onclick="closeModal('checkout-{{ ci.id }}')">✕</button>
+                </div>
+                <form method="POST" action="{{ url_for('children_checkout', checkin_id=ci.id) }}">
+                  <div class="modal-body">
+                    <p class="fs-sm text-slate mb-1">Confirm the person picking up matches one of the approved guardians below.</p>
+                    <div class="form-group">
+                      <label>Picked up by (approved guardian)</label>
+                      <select name="pickup_guardian_id">
+                        <option value="">— Select —</option>
+                        {% for g in guardians_by_child.get(child.id, []) %}
+                        <option value="{{ g.id }}">{{ g.first_name }} {{ g.last_name }}{% if g.phone %} ({{ g.phone }}){% endif %}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    {% if not guardians_by_child.get(child.id) %}
+                    <p class="fs-sm" style="color:#b91c1c;">No approved guardians on file for {{ child.first_name }} yet.</p>
+                    {% endif %}
+                    <div class="form-group">
+                      <label>Not on the list? Enter name (will be flagged for review)</label>
+                      <input type="text" name="other_pickup_name" placeholder="Only if not one of the above">
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeModal('checkout-{{ ci.id }}')">Cancel</button>
+                    <button type="submit" class="btn btn-gold">Confirm Check Out</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+            {% else %}
+            <span class="fs-sm text-slate">Done</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="icon">🧒</div>
+  <p>No children registered in this class yet.</p>
+  <a href="{{ url_for('add_child') }}" class="btn btn-primary mt-1">Add First Child</a>
+</div>
+{% endif %}
+
+{% endblock %}

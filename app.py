@@ -956,6 +956,70 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(question_id, voter_token)
         );
+
+        -- CHILDREN'S MINISTRY -- Phase 6
+        CREATE TABLE IF NOT EXISTS children_classes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            age_range TEXT,
+            leader_name TEXT,
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS children (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
+            date_of_birth TEXT,
+            class_id INTEGER REFERENCES children_classes(id) ON DELETE SET NULL,
+            allergy_notes TEXT,
+            medical_notes TEXT,
+            emergency_contact_name TEXT,
+            emergency_contact_phone TEXT,
+            photo_consent INTEGER DEFAULT 1,
+            status TEXT DEFAULT 'active',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE TABLE IF NOT EXISTS guardians (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
+            phone TEXT,
+            email TEXT,
+            member_id INTEGER REFERENCES members(id) ON DELETE SET NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+
+        -- Approved pickup list: which guardians may pick up which child.
+        -- Checkout (for now) is verified against this list by staff; the
+        -- pickup_code on children_checkins is captured for a future
+        -- stricter mode where the code is also required, not just the name.
+        CREATE TABLE IF NOT EXISTS child_guardians (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+            guardian_id INTEGER NOT NULL REFERENCES guardians(id) ON DELETE CASCADE,
+            relationship TEXT,
+            is_primary INTEGER DEFAULT 0,
+            UNIQUE(child_id, guardian_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS children_checkins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            child_id INTEGER NOT NULL REFERENCES children(id) ON DELETE CASCADE,
+            class_id INTEGER NOT NULL REFERENCES children_classes(id) ON DELETE CASCADE,
+            session_date TEXT NOT NULL,
+            pickup_code TEXT,
+            checked_in_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            checked_in_by INTEGER REFERENCES users(id),
+            dropoff_guardian_id INTEGER REFERENCES guardians(id),
+            checked_out_at TIMESTAMP,
+            checked_out_by INTEGER REFERENCES users(id),
+            pickup_guardian_id INTEGER REFERENCES guardians(id),
+            notes TEXT,
+            UNIQUE(child_id, session_date)
+        );
     """)
 
     # Social settings stubs
@@ -1015,6 +1079,7 @@ ROLE_HIERARCHY = {
     'choir_admin':   50,
     'content_admin': 50,
     'events_admin':  50,
+    'children_admin': 50,
     'member':        10,
 }
 
@@ -1051,6 +1116,7 @@ def is_finance_admin():  return session.get('role') in ('super_admin','admin','f
 def is_choir_admin():    return session.get('role') in ('super_admin','admin','choir_admin')
 def is_content_admin():  return session.get('role') in ('super_admin','admin','content_admin')
 def is_events_admin():   return session.get('role') in ('super_admin','admin','events_admin')
+def is_children_admin(): return session.get('role') in ('super_admin','admin','children_admin')
 
 def is_fellowship_admin():
     return session.get('role') in ('super_admin', 'admin', 'fellowship_leader')
@@ -1127,6 +1193,16 @@ def events_required(f):
         if 'user_id' not in session: return redirect(url_for('login'))
         if not is_events_admin():
             flash('Access denied — events admin required.','danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+def children_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session: return redirect(url_for('login'))
+        if not is_children_admin():
+            flash('Access denied — children\'s ministry admin required.','danger')
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated
@@ -3000,7 +3076,7 @@ def admin_users():
     all_members = query_db("""SELECT m.id, m.first_name, m.last_name, m.email
         FROM members m WHERE m.user_id IS NULL
         ORDER BY m.last_name, m.first_name""")
-    all_roles = ['super_admin','finance_admin','choir_admin','content_admin','events_admin','member']
+    all_roles = ['super_admin','finance_admin','choir_admin','content_admin','events_admin','children_admin','member']
     return render_template('admin_users.html', users=users, all_roles=all_roles,
         all_members=all_members, pending_signups=pending_signups)
 
@@ -4163,6 +4239,266 @@ def audit_log_page():
     return render_template('audit_log.html', logs=logs, page=page, pages=pages,
         total=total, action_filter=action_filter, user_filter=user_filter,
         actions=actions)
+
+
+# ─────────── CHILDREN'S MINISTRY (Phase 6) ───────────
+# Scope: Sunday check-in/check-out across multiple classes. Checkout is
+# verified for now by staff visually confirming the pickup person against
+# each child's approved guardian list (a dropdown, not free text) -- a
+# pickup_code is generated at check-in and stored so a stricter "must match
+# the code" mode can be turned on later without a schema change.
+
+def _generate_pickup_code():
+    import random
+    return f"{random.randint(0, 9999):04d}"
+
+@app.route('/children')
+@children_required
+def children_index():
+    classes = query_db("""SELECT c.*,
+        (SELECT COUNT(*) FROM children WHERE class_id=c.id AND status='active') as child_count,
+        (SELECT COUNT(*) FROM children_checkins WHERE class_id=c.id AND session_date=date('now') AND checked_out_at IS NULL) as checked_in_now
+        FROM children_classes c WHERE c.is_active=1 ORDER BY c.name""")
+    total_children = query_db("SELECT COUNT(*) as c FROM children WHERE status='active'", one=True)['c']
+    checked_in_today = query_db("SELECT COUNT(*) as c FROM children_checkins WHERE session_date=date('now')", one=True)['c']
+    return render_template('children_index.html', classes=classes,
+        total_children=total_children, checked_in_today=checked_in_today)
+
+@app.route('/children/classes/new', methods=['POST'])
+@children_required
+def add_children_class():
+    name = (request.form.get('name') or '').strip()
+    if not name:
+        flash('Class name is required.', 'danger')
+        return redirect(url_for('children_index'))
+    execute_db("INSERT INTO children_classes (name, age_range, leader_name) VALUES (?,?,?)",
+        [name, request.form.get('age_range'), request.form.get('leader_name')])
+    audit('create_children_class', 'children_class', None, name)
+    flash(f'Class "{name}" created.', 'success')
+    return redirect(url_for('children_index'))
+
+@app.route('/children/classes/<int:class_id>/delete', methods=['POST'])
+@children_required
+def delete_children_class(class_id):
+    cls = query_db("SELECT * FROM children_classes WHERE id=?", [class_id], one=True)
+    if cls:
+        execute_db("UPDATE children_classes SET is_active=0 WHERE id=?", [class_id])
+        audit('deactivate_children_class', 'children_class', class_id, cls['name'])
+        flash(f'Class "{cls["name"]}" deactivated.', 'success')
+    return redirect(url_for('children_index'))
+
+@app.route('/children/classes/<int:class_id>')
+@children_required
+def children_class_detail(class_id):
+    cls = query_db("SELECT * FROM children_classes WHERE id=?", [class_id], one=True)
+    if not cls:
+        flash('Class not found.', 'danger')
+        return redirect(url_for('children_index'))
+
+    roster = query_db("""SELECT * FROM children WHERE class_id=? AND status='active'
+        ORDER BY last_name, first_name""", [class_id])
+
+    # Today's check-ins for this class, keyed by child_id for easy lookup in
+    # the template (who's checked in, who's already been picked up).
+    todays_checkins = query_db("""SELECT * FROM children_checkins
+        WHERE class_id=? AND session_date=date('now')""", [class_id])
+    checkins_by_child = {c['child_id']: dict(c) for c in todays_checkins}
+
+    # Approved guardians per child, for the checkout dropdown.
+    guardians_by_child = {}
+    for child in roster:
+        gs = query_db("""SELECT g.* FROM guardians g
+            JOIN child_guardians cg ON cg.guardian_id=g.id
+            WHERE cg.child_id=? ORDER BY cg.is_primary DESC, g.last_name""", [child['id']])
+        guardians_by_child[child['id']] = gs
+
+    return render_template('children_class_detail.html', cls=cls, roster=roster,
+        checkins_by_child=checkins_by_child, guardians_by_child=guardians_by_child)
+
+@app.route('/children/classes/<int:class_id>/checkin', methods=['POST'])
+@children_required
+def children_checkin(class_id):
+    child_id = request.form.get('child_id')
+    dropoff_guardian_id = request.form.get('dropoff_guardian_id') or None
+    child = query_db("SELECT * FROM children WHERE id=?", [child_id], one=True)
+    if not child:
+        flash('Child not found.', 'danger')
+        return redirect(url_for('children_class_detail', class_id=class_id))
+
+    existing = query_db("""SELECT id FROM children_checkins
+        WHERE child_id=? AND session_date=date('now')""", [child_id], one=True)
+    if existing:
+        flash(f'{child["first_name"]} is already checked in today.', 'warning')
+        return redirect(url_for('children_class_detail', class_id=class_id))
+
+    code = _generate_pickup_code()
+    execute_db("""INSERT INTO children_checkins
+        (child_id, class_id, session_date, pickup_code, checked_in_by, dropoff_guardian_id)
+        VALUES (?,?,date('now'),?,?,?)""",
+        [child_id, class_id, code, session.get('user_id'), dropoff_guardian_id])
+    audit('children_checkin', 'child', child_id, f"{child['first_name']} {child['last_name']}",
+        f"Pickup code {code}")
+    flash(f'{child["first_name"]} checked in. Pickup code: {code}', 'success')
+    return redirect(url_for('children_class_detail', class_id=class_id))
+
+@app.route('/children/checkins/<int:checkin_id>/checkout', methods=['POST'])
+@children_required
+def children_checkout(checkin_id):
+    checkin = query_db("SELECT * FROM children_checkins WHERE id=?", [checkin_id], one=True)
+    if not checkin:
+        flash('Check-in record not found.', 'danger')
+        return redirect(url_for('children_index'))
+    if checkin['checked_out_at']:
+        flash('Already checked out.', 'warning')
+        return redirect(url_for('children_class_detail', class_id=checkin['class_id']))
+
+    pickup_guardian_id = request.form.get('pickup_guardian_id') or None
+    other_name = (request.form.get('other_pickup_name') or '').strip()
+    child = query_db("SELECT * FROM children WHERE id=?", [checkin['child_id']], one=True)
+
+    if not pickup_guardian_id and not other_name:
+        flash('Select who is picking up, or enter a name if not on the approved list.', 'danger')
+        return redirect(url_for('children_class_detail', class_id=checkin['class_id']))
+
+    notes = None
+    if other_name:
+        # Not on the approved pickup list -- flagged in notes for the admin
+        # to review, rather than silently recorded as if it were approved.
+        notes = f"NOT ON APPROVED LIST -- picked up by: {other_name}"
+
+    execute_db("""UPDATE children_checkins
+        SET checked_out_at=CURRENT_TIMESTAMP, checked_out_by=?, pickup_guardian_id=?, notes=?
+        WHERE id=?""", [session.get('user_id'), pickup_guardian_id, notes, checkin_id])
+
+    detail = other_name if other_name else None
+    audit('children_checkout', 'child', checkin['child_id'],
+        f"{child['first_name']} {child['last_name']}" if child else None, detail)
+    flash(f'{child["first_name"] if child else "Child"} checked out.' +
+        (' (flagged: not on approved list)' if other_name else ''),
+        'warning' if other_name else 'success')
+    return redirect(url_for('children_class_detail', class_id=checkin['class_id']))
+
+@app.route('/children/add', methods=['GET', 'POST'])
+@children_required
+def add_child():
+    if request.method == 'POST':
+        first_name = (request.form.get('first_name') or '').strip()
+        last_name = (request.form.get('last_name') or '').strip()
+        if not first_name or not last_name:
+            flash('First and last name are required.', 'danger')
+            return redirect(url_for('add_child'))
+
+        child_id = execute_db_get_id("""INSERT INTO children
+            (first_name, last_name, date_of_birth, class_id, allergy_notes, medical_notes,
+             emergency_contact_name, emergency_contact_phone)
+            VALUES (?,?,?,?,?,?,?,?)""",
+            [first_name, last_name,
+             request.form.get('date_of_birth') or None,
+             request.form.get('class_id') or None,
+             request.form.get('allergy_notes') or None,
+             request.form.get('medical_notes') or None,
+             request.form.get('emergency_contact_name') or None,
+             request.form.get('emergency_contact_phone') or None])
+
+        audit('add_child', 'child', child_id, f"{first_name} {last_name}")
+        flash(f'{first_name} added. Now add at least one approved guardian below.', 'success')
+        return redirect(url_for('child_detail', child_id=child_id))
+
+    classes = query_db("SELECT * FROM children_classes WHERE is_active=1 ORDER BY name")
+    return render_template('child_form.html', child=None, classes=classes)
+
+@app.route('/children/<int:child_id>')
+@children_required
+def child_detail(child_id):
+    child = query_db("SELECT * FROM children WHERE id=?", [child_id], one=True)
+    if not child:
+        flash('Child not found.', 'danger')
+        return redirect(url_for('children_index'))
+    guardians = query_db("""SELECT g.*, cg.id as link_id, cg.relationship, cg.is_primary
+        FROM guardians g JOIN child_guardians cg ON cg.guardian_id=g.id
+        WHERE cg.child_id=? ORDER BY cg.is_primary DESC, g.last_name""", [child_id])
+    history = query_db("""SELECT ci.*, g1.first_name as dropoff_fname, g1.last_name as dropoff_lname,
+        g2.first_name as pickup_fname, g2.last_name as pickup_lname
+        FROM children_checkins ci
+        LEFT JOIN guardians g1 ON g1.id=ci.dropoff_guardian_id
+        LEFT JOIN guardians g2 ON g2.id=ci.pickup_guardian_id
+        WHERE ci.child_id=? ORDER BY ci.session_date DESC LIMIT 20""", [child_id])
+    return render_template('child_detail.html', child=child, guardians=guardians, history=history)
+
+@app.route('/children/<int:child_id>/edit', methods=['GET', 'POST'])
+@children_required
+def edit_child(child_id):
+    child = query_db("SELECT * FROM children WHERE id=?", [child_id], one=True)
+    if not child:
+        flash('Child not found.', 'danger')
+        return redirect(url_for('children_index'))
+
+    if request.method == 'POST':
+        execute_db("""UPDATE children SET first_name=?, last_name=?, date_of_birth=?, class_id=?,
+            allergy_notes=?, medical_notes=?, emergency_contact_name=?, emergency_contact_phone=?,
+            status=? WHERE id=?""",
+            [request.form.get('first_name'), request.form.get('last_name'),
+             request.form.get('date_of_birth') or None, request.form.get('class_id') or None,
+             request.form.get('allergy_notes') or None, request.form.get('medical_notes') or None,
+             request.form.get('emergency_contact_name') or None,
+             request.form.get('emergency_contact_phone') or None,
+             request.form.get('status', 'active'), child_id])
+        audit('edit_child', 'child', child_id, f"{request.form.get('first_name')} {request.form.get('last_name')}")
+        flash('Child profile updated.', 'success')
+        return redirect(url_for('child_detail', child_id=child_id))
+
+    classes = query_db("SELECT * FROM children_classes WHERE is_active=1 ORDER BY name")
+    return render_template('child_form.html', child=child, classes=classes)
+
+@app.route('/children/<int:child_id>/guardians/add', methods=['POST'])
+@children_required
+def add_child_guardian(child_id):
+    child = query_db("SELECT * FROM children WHERE id=?", [child_id], one=True)
+    if not child:
+        flash('Child not found.', 'danger')
+        return redirect(url_for('children_index'))
+
+    existing_guardian_id = request.form.get('existing_guardian_id')
+    if existing_guardian_id:
+        guardian_id = existing_guardian_id
+    else:
+        first_name = (request.form.get('first_name') or '').strip()
+        last_name = (request.form.get('last_name') or '').strip()
+        if not first_name or not last_name:
+            flash('Guardian first and last name are required.', 'danger')
+            return redirect(url_for('child_detail', child_id=child_id))
+        guardian_id = execute_db_get_id(
+            "INSERT INTO guardians (first_name, last_name, phone, email) VALUES (?,?,?,?)",
+            [first_name, last_name, request.form.get('phone'), request.form.get('email')])
+
+    try:
+        execute_db("""INSERT INTO child_guardians (child_id, guardian_id, relationship, is_primary)
+            VALUES (?,?,?,?)""",
+            [child_id, guardian_id, request.form.get('relationship'),
+             1 if request.form.get('is_primary') else 0])
+        audit('add_child_guardian', 'child', child_id, f"{child['first_name']} {child['last_name']}")
+        flash('Guardian added to approved pickup list.', 'success')
+    except Exception:
+        flash('That guardian is already on this child\'s approved list.', 'warning')
+    return redirect(url_for('child_detail', child_id=child_id))
+
+@app.route('/children/<int:child_id>/guardians/<int:link_id>/remove', methods=['POST'])
+@children_required
+def remove_child_guardian(child_id, link_id):
+    execute_db("DELETE FROM child_guardians WHERE id=? AND child_id=?", [link_id, child_id])
+    audit('remove_child_guardian', 'child', child_id)
+    flash('Guardian removed from approved pickup list.', 'success')
+    return redirect(url_for('child_detail', child_id=child_id))
+
+@app.route('/children/guardians/search')
+@children_required
+def search_guardians():
+    q = request.args.get('q', '').strip()
+    if len(q) < 2:
+        return jsonify([])
+    results = query_db("""SELECT id, first_name, last_name, phone FROM guardians
+        WHERE first_name LIKE ? OR last_name LIKE ? LIMIT 10""", [f'%{q}%', f'%{q}%'])
+    return jsonify([dict(r) for r in results])
 
 
 # ─────────── MAIN ───────────

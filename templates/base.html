@@ -76,6 +76,14 @@
     {% endif %}
     {% endif %}
 
+    <!-- CHILDREN'S MINISTRY MODULE -->
+    {% if session.get('role') in ['super_admin','admin','children_admin'] %}
+    <div class="nav-section-label">🧒 Children's Ministry</div>
+    <a href="{{ url_for('children_index') }}" class="nav-link {% if request.endpoint in ['children_index','children_class_detail','add_child','edit_child','child_detail'] %}active{% endif %}">
+      <span class="nav-icon">🧒</span> <span>Check-In / Check-Out</span>
+    </a>
+    {% endif %}
+
     <!-- FINANCE MODULE -->
     <div class="nav-section-label">💰 Finance</div>
     <a href="{{ url_for('finance') }}" class="nav-link {% if request.endpoint in ['finance','finance_import'] %}active{% endif %}">

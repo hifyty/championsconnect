@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block title %}{{ child.first_name }} {{ child.last_name }}{% endblock %}
+{% block page_title %}🧒 {{ child.first_name }} {{ child.last_name }}{% endblock %}
+{% block topbar_actions %}
+<a href="{{ url_for('edit_child', child_id=child.id) }}" class="btn btn-outline">✏️ Edit</a>
+{% endblock %}
+
+{% block content %}
+
+{% if child.allergy_notes or child.medical_notes %}
+<div class="card" style="border-left:4px solid #b91c1c;margin-bottom:16px;">
+  <div class="card-body">
+    <div class="fw-bold" style="color:#b91c1c;margin-bottom:6px;">⚠️ Medical &amp; Safety Notes</div>
+    {% if child.allergy_notes %}<p class="fs-sm"><strong>Allergies:</strong> {{ child.allergy_notes }}</p>{% endif %}
+    {% if child.medical_notes %}<p class="fs-sm"><strong>Other:</strong> {{ child.medical_notes }}</p>{% endif %}
+    {% if child.emergency_contact_name %}
+    <p class="fs-sm"><strong>Emergency Contact:</strong> {{ child.emergency_contact_name }}
+      {% if child.emergency_contact_phone %} &middot; {{ child.emergency_contact_phone }}{% endif %}</p>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">👪 Approved Pickup Guardians</div>
+      <button class="btn btn-sm btn-gold" onclick="openModal('addGuardianModal')">+ Add Guardian</button>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if guardians %}
+      <table>
+        <thead><tr><th>Name</th><th>Relationship</th><th>Contact</th><th></th></tr></thead>
+        <tbody>
+          {% for g in guardians %}
+          <tr>
+            <td><strong>{{ g.first_name }} {{ g.last_name }}</strong>{% if g.is_primary %} <span class="badge badge-active fs-sm">Primary</span>{% endif %}</td>
+            <td class="fs-sm text-slate">{{ g.relationship or '—' }}</td>
+            <td class="fs-sm text-slate">{{ g.phone or g.email or '—' }}</td>
+            <td>
+              <form method="POST" action="{{ url_for('remove_child_guardian', child_id=child.id, link_id=g.link_id) }}"
+                    onsubmit="return confirm('Remove this guardian from the approved pickup list?')">
+                <button type="submit" class="btn btn-xs btn-outline" style="color:#b91c1c;border-color:#fecaca;">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="icon">👪</div>
+        <p>No approved guardians yet. Add at least one before this child can be checked out.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">📋 Check-In History</div>
+    </div>
+    <div class="card-body" style="padding:0;">
+      {% if history %}
+      <table>
+        <thead><tr><th>Date</th><th>Dropped off</th><th>Picked up</th></tr></thead>
+        <tbody>
+          {% for h in history %}
+          <tr>
+            <td class="fs-sm">{{ h.session_date }}</td>
+            <td class="fs-sm text-slate">{{ h.dropoff_fname ~ ' ' ~ h.dropoff_lname if h.dropoff_fname else '—' }}</td>
+            <td class="fs-sm text-slate">
+              {% if h.notes %}
+                <span style="color:#b91c1c;">{{ h.notes }}</span>
+              {% elif h.pickup_fname %}
+                {{ h.pickup_fname }} {{ h.pickup_lname }}
+              {% elif h.checked_out_at %}
+                —
+              {% else %}
+                Still checked in
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <div class="empty-state">
+        <div class="icon">📋</div>
+        <p>No check-ins recorded yet.</p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ADD GUARDIAN MODAL -->
+<div class="modal-overlay" id="addGuardianModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">👪 Add Approved Guardian</div>
+      <button class="modal-close" onclick="closeModal('addGuardianModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_child_guardian', child_id=child.id) }}">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label>First Name *</label>
+            <input type="text" name="first_name" required>
+          </div>
+          <div class="form-group">
+            <label>Last Name *</label>
+            <input type="text" name="last_name" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Phone</label>
+            <input type="tel" name="phone">
+          </div>
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" name="email">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Relationship</label>
+            <input type="text" name="relationship" placeholder="e.g. Mother, Grandfather">
+          </div>
+          <div class="form-group" style="display:flex;align-items:flex-end;padding-bottom:10px;">
+            <label style="display:flex;align-items:center;gap:6px;font-weight:400;text-transform:none;">
+              <input type="checkbox" name="is_primary" value="1" style="width:auto;"> Primary guardian
+            </label>
+          </div>
+        </div>
+        <p class="fs-sm text-slate">Tip: if this guardian is already on file for another child, just search their name instead of re-entering details — ask an admin if you're not sure.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addGuardianModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Add Guardian</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

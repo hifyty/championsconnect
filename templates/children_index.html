@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Children's Ministry{% endblock %}
+{% block page_title %}Children's Ministry{% endblock %}
+{% block topbar_actions %}
+<button class="btn btn-gold" onclick="openModal('addClassModal')">+ New Class</button>
+<a href="{{ url_for('add_child') }}" class="btn btn-outline">+ Add Child</a>
+{% endblock %}
+
+{% block content %}
+
+<div class="stats-grid">
+  <div class="stat-card blue">
+    <div class="stat-icon">🧒</div>
+    <div>
+      <div class="stat-value">{{ total_children }}</div>
+      <div class="stat-label">Registered Children</div>
+    </div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-icon">✅</div>
+    <div>
+      <div class="stat-value">{{ checked_in_today }}</div>
+      <div class="stat-label">Checked In Today</div>
+    </div>
+  </div>
+  <div class="stat-card purple">
+    <div class="stat-icon">🏫</div>
+    <div>
+      <div class="stat-value">{{ classes|length }}</div>
+      <div class="stat-label">Active Classes</div>
+    </div>
+  </div>
+</div>
+
+{% if classes %}
+<div class="grid-2 mt-2">
+  {% for c in classes %}
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">🏫 {{ c.name }}</div>
+      <a href="{{ url_for('children_class_detail', class_id=c.id) }}" class="btn btn-sm btn-primary">Open</a>
+    </div>
+    <div class="card-body">
+      {% if c.age_range %}<p class="text-slate fs-sm mb-1">Ages {{ c.age_range }}</p>{% endif %}
+      {% if c.leader_name %}<p class="text-slate fs-sm mb-1">Leader: {{ c.leader_name }}</p>{% endif %}
+      <div class="d-flex gap-2" style="flex-wrap:wrap;margin-top:8px;">
+        <span class="badge badge-info">👥 {{ c.child_count }} children</span>
+        <span class="badge badge-success">✅ {{ c.checked_in_now }} checked in now</span>
+      </div>
+      {% if session.get('role') in ['super_admin','admin'] %}
+      <form method="POST" action="{{ url_for('delete_children_class', class_id=c.id) }}"
+            onsubmit="return confirm('Deactivate this class? Children already assigned stay on record.')" style="margin-top:12px;">
+        <button type="submit" class="btn btn-sm btn-outline" style="color:#b91c1c;border-color:#fecaca;">Deactivate Class</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+  <div class="icon">🏫</div>
+  <p>No classes set up yet.</p>
+  <button class="btn btn-primary mt-1" onclick="openModal('addClassModal')">Create First Class</button>
+</div>
+{% endif %}
+
+<!-- NEW CLASS MODAL -->
+<div class="modal-overlay" id="addClassModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🏫 New Class</div>
+      <button class="modal-close" onclick="closeModal('addClassModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('add_children_class') }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Class Name *</label>
+          <input type="text" name="name" required placeholder="e.g. Toddlers">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Age Range</label>
+            <input type="text" name="age_range" placeholder="e.g. 2-4">
+          </div>
+          <div class="form-group">
+            <label>Leader / Teacher</label>
+            <input type="text" name="leader_name" placeholder="e.g. Sister Grace">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addClassModal')">Cancel</button>
+        <button type="submit" class="btn btn-gold">Create Class</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
