@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Give Online · Champions Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#1a2744">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Champions">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744; --gold: #c9a84c; --slate: #64748b; --ivory: #faf8f2;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      background: var(--navy);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 420px;
+      background: var(--ivory);
+      border-radius: 20px;
+      padding: 36px 32px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 28px;
+    }
+    .brand-icon {
+      width: 40px; height: 40px; background: var(--gold); border-radius: 10px;
+      display: flex; align-items: center; justify-content: center; font-size: 19px; flex-shrink: 0;
+    }
+    .brand-text { font-family: 'Playfair Display', serif; font-size: 1rem; color: var(--navy); line-height: 1.2; }
+    .brand-sub { font-size: 0.65rem; letter-spacing: 2px; text-transform: uppercase; color: var(--gold); margin-top: 2px; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--navy); margin-bottom: 6px; }
+    .subtitle { font-size: 0.88rem; color: var(--slate); margin-bottom: 28px; line-height: 1.5; }
+    .flash { padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px; font-weight: 500; }
+    .flash-danger { background: #fee2e2; color: #991b1b; }
+    .flash-warning { background: #fef9c3; color: #854d0e; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--navy); letter-spacing: 0.3px; margin-bottom: 6px; text-transform: uppercase; }
+    input, select {
+      width: 100%; padding: 12px 14px; border: 1.5px solid #dde3ec; border-radius: 10px;
+      font-size: 0.95rem; font-family: 'Inter', sans-serif; color: var(--navy); background: #fff; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--navy); }
+    .btn-give {
+      width: 100%; padding: 14px; background: var(--gold); color: var(--navy); border: none;
+      border-radius: 10px; font-size: 0.95rem; font-weight: 700; cursor: pointer; margin-top: 6px;
+    }
+    .btn-give:hover { background: #d9bb5e; }
+    .note { font-size: 0.78rem; color: var(--slate); margin-top: 16px; line-height: 1.6; text-align: center; }
+    .note a { color: var(--navy); font-weight: 600; text-decoration: none; }
+    .note a:hover { text-decoration: underline; }
+    .empty-icon { font-size: 2.5rem; text-align: center; margin-bottom: 12px; }
+    .empty-text { text-align: center; color: var(--slate); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <div class="brand-icon">✝</div>
+      <div>
+        <div class="brand-text">Champions Connect</div>
+        <div class="brand-sub">RCCG Champions Parish</div>
+      </div>
+    </div>
+
+    {% if stripe_configured %}
+      <h1>Give Online</h1>
+      <p class="subtitle">Give a one-time gift securely — no account needed. Have an account? <a href="{{ url_for('login') }}" style="color:var(--navy);font-weight:600;">Log in</a> to give monthly and track your giving history.</p>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="flash flash-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('giving.give_checkout') }}">
+        <div class="form-group">
+          <label>Your Name</label>
+          <input type="text" name="guest_name" placeholder="e.g. Jane Doe (or leave blank to give anonymously)">
+        </div>
+        <div class="form-group">
+          <label>Email Address *</label>
+          <input type="email" name="guest_email" required placeholder="you@example.com">
+        </div>
+        <div class="form-group">
+          <label>Amount (CAD) *</label>
+          <input type="number" name="amount" min="1" step="0.01" required placeholder="e.g. 50.00">
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select name="category_id">
+            <option value="">General Giving</option>
+            {% for c in categories %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn-give">Continue to Payment →</button>
+      </form>
+      <p class="note">You'll be taken to Stripe's secure checkout to complete payment. Champions Connect never sees or stores your card details.</p>
+    {% else %}
+      <div class="empty-icon">⏳</div>
+      <p class="empty-text">Online giving isn't set up yet — check back soon.</p>
+    {% endif %}
+  </div>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>

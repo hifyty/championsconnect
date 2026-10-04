@@ -1,11 +1,13 @@
 """
 Online Giving (Stripe) — Phase 2
 
-Lets a logged-in member give online (one-time or monthly) from their phone.
-Stripe Checkout does the actual card collection (so this app never touches
-card numbers), and a webhook records completed payments straight into the
-existing `donations` table -- no manual reconciliation for anything given
-this way.
+Lets anyone give online from their phone -- no account required for a
+one-time gift (/give shows a standalone guest form to anyone not logged
+in), and logged-in members with a linked profile also get monthly/recurring
+giving plus their giving history. Stripe Checkout does the actual card
+collection (so this app never touches card numbers), and a webhook records
+completed payments straight into the existing `donations` table -- no
+manual reconciliation for anything given this way, guest or member.
 
 SETUP (do this once you have real Stripe keys):
   1. Set these in your .env locally / Render's environment settings:
@@ -62,20 +64,36 @@ def _login_required(f):
 
 
 @giving_bp.route('/give')
-@_login_required
 def give_page():
+    """Public: no login required. Logged-in members with a linked profile
+    get the full give.html (monthly option, pre-filled, feeds their giving
+    history). Everyone else -- guests, visitors, anyone without an account --
+    gets give_guest.html: a standalone page (no admin sidebar) for a
+    one-time gift. Recurring/monthly giving stays account-only since
+    managing a subscription later needs somewhere for it to live."""
     from app import query_db
     categories = query_db("SELECT * FROM finance_categories ORDER BY name")
     member = _get_current_member()
-    return render_template('give.html',
-        stripe_configured=_stripe_configured(),
-        categories=categories,
-        member=member)
+    if 'user_id' in session and not member:
+        # Logged in, but this account isn't linked to a member record --
+        # that's a data/admin issue, not a "give as guest" situation, so
+        # keep the existing explicit warning rather than silently
+        # downgrading them to the guest flow.
+        return render_template('give.html',
+            stripe_configured=_stripe_configured(), categories=categories, member=None)
+    if member:
+        return render_template('give.html',
+            stripe_configured=_stripe_configured(), categories=categories, member=member)
+    return render_template('give_guest.html',
+        stripe_configured=_stripe_configured(), categories=categories)
 
 
 @giving_bp.route('/give/checkout', methods=['POST'])
-@_login_required
 def give_checkout():
+    """Public: no login required. Branches on whether this request comes
+    from a logged-in member (full flow, supports monthly) or a guest
+    (one-time gift only, identified by the email they type in -- there's no
+    account for a subscription to belong to)."""
     from app import query_db, execute_db
 
     if not _stripe_configured():
@@ -83,7 +101,9 @@ def give_checkout():
         return redirect(url_for('giving.give_page'))
 
     member = _get_current_member()
-    if not member:
+    is_guest = member is None
+
+    if 'user_id' in session and not member:
         flash('Your login is not linked to a member profile yet -- ask an admin to link it.', 'danger')
         return redirect(url_for('giving.give_page'))
 
@@ -95,17 +115,15 @@ def give_checkout():
         flash('Enter an amount greater than $0.', 'danger')
         return redirect(url_for('giving.give_page'))
 
-    frequency = request.form.get('frequency', 'once')  # 'once' or 'monthly'
+    # Guests can only give once -- monthly giving needs an account to manage
+    # the subscription later, so the guest form never offers it, and we
+    # don't trust the 'frequency' field for a guest even if it were tampered.
+    frequency = 'once' if is_guest else request.form.get('frequency', 'once')
     category_id = request.form.get('category_id') or None
     category = query_db("SELECT * FROM finance_categories WHERE id=?", [category_id], one=True) if category_id else None
     category_name = category['name'] if category else 'General Giving'
 
     stripe = _get_stripe()
-
-    # Reuse a Stripe Customer for this member if we've seen them before, so
-    # repeat/renewal payments all tie back to the same donor on Stripe's side.
-    existing = query_db("SELECT * FROM stripe_donors WHERE member_id=?", [member['id']], one=True)
-    customer_id = existing['stripe_customer_id'] if existing else None
 
     line_item = {
         'price_data': {
@@ -116,26 +134,48 @@ def give_checkout():
         'quantity': 1,
     }
 
-    session_kwargs = dict(
-        mode='subscription' if frequency == 'monthly' else 'payment',
-        line_items=[line_item],
-        success_url=url_for('giving.give_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
-        cancel_url=url_for('giving.give_page', _external=True),
-        metadata={'member_id': str(member['id']), 'category_id': str(category_id or '')},
-        client_reference_id=str(member['id']),
-    )
-    if customer_id:
-        session_kwargs['customer'] = customer_id
-    else:
-        session_kwargs['customer_email'] = member['email']
+    if is_guest:
+        guest_name = (request.form.get('guest_name') or '').strip() or 'Anonymous Donor'
+        guest_email = (request.form.get('guest_email') or '').strip()
+        if not guest_email:
+            flash('Enter your email address.', 'danger')
+            return redirect(url_for('giving.give_page'))
 
-    if frequency == 'monthly':
-        line_item['price_data']['recurring'] = {'interval': 'month'}
-        # Carry the same metadata onto the subscription itself so renewal
-        # webhooks (invoice.paid) can still tell which category this is.
-        session_kwargs['subscription_data'] = {
-            'metadata': {'member_id': str(member['id']), 'category_id': str(category_id or '')}
-        }
+        session_kwargs = dict(
+            mode='payment',
+            line_items=[line_item],
+            success_url=url_for('giving.give_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_for('giving.give_page', _external=True),
+            customer_email=guest_email,
+            metadata={'guest_name': guest_name, 'guest_email': guest_email, 'category_id': str(category_id or '')},
+        )
+    else:
+        # Reuse a Stripe Customer for this member if we've seen them before,
+        # so repeat/renewal payments all tie back to the same donor on
+        # Stripe's side.
+        existing = query_db("SELECT * FROM stripe_donors WHERE member_id=?", [member['id']], one=True)
+        customer_id = existing['stripe_customer_id'] if existing else None
+
+        session_kwargs = dict(
+            mode='subscription' if frequency == 'monthly' else 'payment',
+            line_items=[line_item],
+            success_url=url_for('giving.give_success', _external=True) + '?session_id={CHECKOUT_SESSION_ID}',
+            cancel_url=url_for('giving.give_page', _external=True),
+            metadata={'member_id': str(member['id']), 'category_id': str(category_id or '')},
+            client_reference_id=str(member['id']),
+        )
+        if customer_id:
+            session_kwargs['customer'] = customer_id
+        else:
+            session_kwargs['customer_email'] = member['email']
+
+        if frequency == 'monthly':
+            line_item['price_data']['recurring'] = {'interval': 'month'}
+            # Carry the same metadata onto the subscription itself so renewal
+            # webhooks (invoice.paid) can still tell which category this is.
+            session_kwargs['subscription_data'] = {
+                'metadata': {'member_id': str(member['id']), 'category_id': str(category_id or '')}
+            }
 
     try:
         checkout_session = stripe.checkout.Session.create(**session_kwargs)
@@ -194,12 +234,15 @@ def give_webhook():
         mode = data_object.get('mode')
         metadata = data_object.get('metadata') or {}
         member_id = metadata.get('member_id')
+        guest_name = metadata.get('guest_name')
         category_id = metadata.get('category_id') or None
         customer_id = data_object.get('customer')
         session_id = data_object.get('id')
 
         # Remember the Stripe customer <-> member link for future renewals,
         # whether this was a one-time gift or the start of a subscription.
+        # (Guests never reach here with member_id set, so this never fires
+        # for them -- there's no member row for a guest's payment to link to.)
         if member_id and customer_id:
             existing = query_db("SELECT id FROM stripe_donors WHERE stripe_customer_id=?", [customer_id], one=True)
             if not existing:
@@ -212,6 +255,15 @@ def give_webhook():
                 (member_id, amount, category_id, donation_date, payment_method, reference_number, notes)
                 VALUES (?,?,?,date('now'),'stripe',?,'Online giving (one-time)')""",
                 [member_id, (amount_total or 0) / 100, category_id, session_id])
+        elif mode == 'payment' and not member_id and guest_name and not already_recorded(session_id):
+            # Guest gift -- no member to attach it to, recorded the same way
+            # a manually-entered "Anonymous Donor" cash gift already is
+            # (donations.member_id is nullable precisely for this case).
+            amount_total = data_object.get('amount_total')
+            execute_db("""INSERT INTO donations
+                (member_id, donor_name, amount, category_id, donation_date, payment_method, reference_number, notes)
+                VALUES (NULL,?,?,?,date('now'),'stripe',?,'Online giving (guest, one-time)')""",
+                [guest_name, (amount_total or 0) / 100, category_id, session_id])
         # mode == 'subscription': don't record here -- the first and every
         # later charge for a subscription comes through invoice.paid below,
         # so subscriptions are only ever counted once, consistently.

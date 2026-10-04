@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're offline · Champions Connect</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, 'Inter', sans-serif;
+      min-height: 100vh;
+      background: #1a2744;
+      color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px; text-align: center;
+    }
+    .wrap { max-width: 360px; }
+    .icon { font-size: 2.6rem; margin-bottom: 18px; }
+    h1 { font-size: 1.3rem; margin-bottom: 10px; }
+    p { color: rgba(255,255,255,.65); font-size: 0.92rem; line-height: 1.6; margin-bottom: 24px; }
+    button {
+      background: #c9a84c; color: #1a2744; border: none; border-radius: 10px;
+      padding: 12px 24px; font-size: 0.9rem; font-weight: 700; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="icon">📡</div>
+    <h1>You're offline</h1>
+    <p>Champions Connect needs an internet connection for things like giving, attendance and your member data. Reconnect and try again.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>

@@ -888,8 +888,23 @@ textarea { min-height: 100px; resize: vertical; }
   /* Modals full width */
   .modal { width: 95%; max-height: 85vh; }
 
-  /* Topbar actions wrap */
-  .topbar > div:last-child { flex-wrap: wrap; gap: 6px; }
+  /* Topbar actions -- on a narrow screen there often isn't room for every
+     action button on one line even wrapped two-per-row (confirmed: with 4+
+     buttons, wrapped pairs still overflow past 375px). Instead keep them on
+     one row and let that row scroll horizontally, like a toolbar -- this
+     keeps the header a fixed, compact height instead of growing tall with
+     stacked buttons, and the buttons themselves never get clipped. */
+  .topbar > div:last-child {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 6px;
+    max-width: 65vw;
+  }
+  .topbar > div:last-child::-webkit-scrollbar { display: none; }
+  .topbar > div:last-child .btn,
+  .topbar > div:last-child a.btn { flex-shrink: 0; }
 }
 
 /* ── PHONE (480px) ── */
