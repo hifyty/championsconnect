@@ -163,6 +163,12 @@ a { text-decoration: none; color: inherit; }
 .main-content {
   margin-left: var(--sidebar-w);
   flex: 1;
+  min-width: 0; /* flex items default to min-width:auto, which lets deep
+    content (like a wide table) force this column -- and the whole page --
+    wider than the viewport on a phone. min-width:0 lets it shrink to the
+    actual available space, so internal overflow-x:auto regions (tables,
+    the topbar actions row) scroll within themselves instead of blowing out
+    the whole layout. */
   min-height: 100vh;
   display: flex;
   flex-direction: column;
