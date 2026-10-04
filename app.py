@@ -4450,6 +4450,27 @@ def edit_child(child_id):
     classes = query_db("SELECT * FROM children_classes WHERE is_active=1 ORDER BY name")
     return render_template('child_form.html', child=child, classes=classes)
 
+@app.route('/children/<int:child_id>/delete', methods=['POST'])
+@children_required
+def delete_child(child_id):
+    if not is_super_admin():
+        flash('Access denied — only a super admin can permanently delete a child record.', 'danger')
+        return redirect(url_for('child_detail', child_id=child_id))
+    child = query_db("SELECT * FROM children WHERE id=?", [child_id], one=True)
+    if not child:
+        flash('Child not found.', 'danger')
+        return redirect(url_for('children_index'))
+    class_id = child['class_id']
+    name = f"{child['first_name']} {child['last_name']}"
+    # ON DELETE CASCADE on child_guardians and children_checkins (both FK to
+    # children.id) cleans up guardian links and check-in history together --
+    # guardians themselves are untouched since they may be linked to other
+    # children (siblings).
+    execute_db("DELETE FROM children WHERE id=?", [child_id])
+    audit('delete_child', 'child', child_id, name)
+    flash(f'{name} has been deleted.', 'success')
+    return redirect(url_for('children_class_detail', class_id=class_id) if class_id else url_for('children_index'))
+
 @app.route('/children/<int:child_id>/guardians/add', methods=['POST'])
 @children_required
 def add_child_guardian(child_id):
