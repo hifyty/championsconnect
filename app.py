@@ -1905,7 +1905,7 @@ def attendance():
                SUM(CASE WHEN status='absent' THEN 1 ELSE 0 END) as absent,
                SUM(CASE WHEN status='excused' THEN 1 ELSE 0 END) as excused
         FROM service_attendance
-        GROUP BY service_date ORDER BY service_date DESC LIMIT 20
+        GROUP BY service_date, service_type ORDER BY service_date DESC LIMIT 20
     """)
     rehearsals = query_db("""
         SELECT r.*,
