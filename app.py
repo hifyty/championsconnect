@@ -241,10 +241,13 @@ def get_church_settings():
         return row
     return {
         'org_name':    'RCCG Champions Parish',
-        'org_address': '18811 111 Ave, Edmonton, Alberta',
+        'org_address': '18811 - 111 Avenue NW, Edmonton, AB T5S 2X4',
         'org_city':    'Edmonton, Alberta, Canada',
         'cra_number':  '844574376 RR0001',
-        'admin_email': '', 'website': '', 'phone': ''
+        'admin_email': 'rccgchampionsparish@gmail.com', 'website': '', 'phone': '',
+        'service_times': '', 'facebook_url': 'https://facebook.com/rccg.champions',
+        'instagram_url': 'https://www.instagram.com/rccgchampionsparishedmonton/',
+        'youtube_url': 'https://www.youtube.com/@RCCGChampionsParishEdmonton'
     }
 
 
@@ -325,12 +328,16 @@ def init_db():
         CREATE TABLE IF NOT EXISTS church_settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             org_name TEXT DEFAULT 'RCCG Champions Parish',
-            org_address TEXT DEFAULT '18811 111 Ave, Edmonton, Alberta',
+            org_address TEXT DEFAULT '18811 - 111 Avenue NW, Edmonton, AB T5S 2X4',
             org_city TEXT DEFAULT 'Edmonton, Alberta, Canada',
             cra_number TEXT DEFAULT '844574376 RR0001',
             admin_email TEXT,
             website TEXT,
             phone TEXT,
+            service_times TEXT,
+            facebook_url TEXT,
+            instagram_url TEXT,
+            youtube_url TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -743,8 +750,10 @@ def init_db():
 
     if _exec(db, "SELECT COUNT(*) as c FROM church_settings").fetchone()['c'] == 0:
         _exec(db, """INSERT INTO church_settings
-            (org_name, org_address, org_city, cra_number)
-            VALUES ('RCCG Champions Parish','18811 111 Ave, Edmonton, Alberta','Edmonton, Alberta, Canada','844574376 RR0001')"""  )
+            (org_name, org_address, org_city, cra_number, admin_email, facebook_url, instagram_url, youtube_url)
+            VALUES ('RCCG Champions Parish','18811 - 111 Avenue NW, Edmonton, AB T5S 2X4','Edmonton, Alberta, Canada','844574376 RR0001',
+                'rccgchampionsparish@gmail.com','https://facebook.com/rccg.champions',
+                'https://www.instagram.com/rccgchampionsparishedmonton/','https://www.youtube.com/@RCCGChampionsParishEdmonton')"""  )
 
     # SMS settings
     if _exec(db, "SELECT COUNT(*) as c FROM sms_settings").fetchone()['c'] == 0:
@@ -888,19 +897,35 @@ def init_db():
         _exec(db, """CREATE TABLE IF NOT EXISTS church_settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             org_name TEXT DEFAULT 'RCCG Champions Parish',
-            org_address TEXT DEFAULT '18811 111 Ave, Edmonton, Alberta',
+            org_address TEXT DEFAULT '18811 - 111 Avenue NW, Edmonton, AB T5S 2X4',
             org_city TEXT DEFAULT 'Edmonton, Alberta, Canada',
             cra_number TEXT DEFAULT '844574376 RR0001',
-            admin_email TEXT, website TEXT, phone TEXT,
+            admin_email TEXT, website TEXT, phone TEXT, service_times TEXT,
+            facebook_url TEXT, instagram_url TEXT, youtube_url TEXT,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
         db.commit()
         if _exec(db, "SELECT COUNT(*) as c FROM church_settings").fetchone()['c'] == 0:
-            _exec(db, """INSERT INTO church_settings (org_name,org_address,org_city,cra_number)
-                VALUES ('RCCG Champions Parish','18811 111 Ave, Edmonton, Alberta',
-                'Edmonton, Alberta, Canada','844574376 RR0001')""")
+            _exec(db, """INSERT INTO church_settings (org_name,org_address,org_city,cra_number,admin_email,facebook_url,instagram_url,youtube_url)
+                VALUES ('RCCG Champions Parish','18811 - 111 Avenue NW, Edmonton, AB T5S 2X4',
+                'Edmonton, Alberta, Canada','844574376 RR0001','rccgchampionsparish@gmail.com',
+                'https://facebook.com/rccg.champions','https://www.instagram.com/rccgchampionsparishedmonton/',
+                'https://www.youtube.com/@RCCGChampionsParishEdmonton')""")
             db.commit()
     except Exception:
         pass
+
+    # Migration: add new columns to church_settings if they don't exist yet (existing DBs)
+    for col, definition in [
+        ('service_times',  'TEXT'),
+        ('facebook_url',   'TEXT'),
+        ('instagram_url',  'TEXT'),
+        ('youtube_url',    'TEXT'),
+    ]:
+        try:
+            _exec(db, f"ALTER TABLE church_settings ADD COLUMN {col} {definition}")
+            db.commit()
+        except Exception:
+            pass  # Column already exists
 
     # Migration: add new columns to users if they don't exist yet
     for col, definition in [
@@ -4165,7 +4190,8 @@ def church_settings_page():
     if request.method == 'POST':
         execute_db("""UPDATE church_settings SET
             org_name=?, org_address=?, org_city=?, cra_number=?,
-            admin_email=?, website=?, phone=?, updated_at=datetime('now')
+            admin_email=?, website=?, phone=?, service_times=?,
+            facebook_url=?, instagram_url=?, youtube_url=?, updated_at=datetime('now')
             WHERE id=1""", [
             request.form.get('org_name','').strip(),
             request.form.get('org_address','').strip(),
@@ -4174,12 +4200,31 @@ def church_settings_page():
             request.form.get('admin_email','').strip(),
             request.form.get('website','').strip(),
             request.form.get('phone','').strip(),
+            request.form.get('service_times','').strip(),
+            request.form.get('facebook_url','').strip(),
+            request.form.get('instagram_url','').strip(),
+            request.form.get('youtube_url','').strip(),
         ])
         audit('SETTINGS_UPDATED', 'church_settings')
         flash('Church settings updated! ✅', 'success')
         return redirect(url_for('church_settings_page'))
     settings = get_church_settings()
     return render_template('church_settings.html', settings=settings)
+
+
+# ─────────────────────────────────────────────
+# PUBLIC CONTACT PAGE -- no login required
+# ─────────────────────────────────────────────
+
+@app.route('/contact')
+def contact_page():
+    """Public Contact Us page. Anyone can view it, logged in or not --
+    visitors deciding whether to attend a service shouldn't need an
+    account first. Pulls everything from church_settings so a super
+    admin only ever has to update it in one place (Settings)."""
+    settings = get_church_settings()
+    return render_template('contact.html', settings=settings,
+                            is_logged_in=('user_id' in session))
 
 
 @app.route('/admin/change-password', methods=['POST'])

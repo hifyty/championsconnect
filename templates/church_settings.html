@@ -55,6 +55,30 @@
                    value="{{ settings.website or '' }}"
                    placeholder="https://www.champions.ca">
           </div>
+          <div class="form-group">
+            <label class="form-label">Service Times</label>
+            <textarea name="service_times" class="form-control" rows="2"
+                      placeholder="e.g. Sundays 10:00 AM &amp; 12:30 PM">{{ settings.service_times or '' }}</textarea>
+            <div class="fs-sm text-slate" style="margin-top:4px;">Shown on the public Contact Us page.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Facebook URL</label>
+            <input type="url" name="facebook_url" class="form-control"
+                   value="{{ settings.facebook_url or '' }}"
+                   placeholder="https://facebook.com/yourchurch">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Instagram URL</label>
+            <input type="url" name="instagram_url" class="form-control"
+                   value="{{ settings.instagram_url or '' }}"
+                   placeholder="https://instagram.com/yourchurch">
+          </div>
+          <div class="form-group">
+            <label class="form-label">YouTube URL</label>
+            <input type="url" name="youtube_url" class="form-control"
+                   value="{{ settings.youtube_url or '' }}"
+                   placeholder="https://youtube.com/@yourchurch">
+          </div>
           <button type="submit" class="btn btn-primary">Save Settings ✅</button>
         </form>
       </div>

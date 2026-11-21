@@ -6,6 +6,7 @@
   <title>Give Online · Champions Connect</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="theme-color" content="#1a2744">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
@@ -66,11 +67,7 @@
 <body>
   <div class="card">
     <div class="brand">
-      <div class="brand-icon">✝</div>
-      <div>
-        <div class="brand-text">Champions Connect</div>
-        <div class="brand-sub">RCCG Champions Parish</div>
-      </div>
+      <img src="{{ url_for('static', filename='img/logo-horizontal-color.png') }}" alt="Champions Parish" style="height:34px;width:auto;">
     </div>
 
     {% if stripe_configured %}
@@ -108,6 +105,7 @@
         <button type="submit" class="btn-give">Continue to Payment →</button>
       </form>
       <p class="note">You'll be taken to Stripe's secure checkout to complete payment. Champions Connect never sees or stores your card details.</p>
+      <p class="note"><a href="{{ url_for('contact_page') }}">Contact Us</a></p>
     {% else %}
       <div class="empty-icon">⏳</div>
       <p class="empty-text">Online giving isn't set up yet — check back soon.</p>

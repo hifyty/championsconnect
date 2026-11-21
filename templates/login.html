@@ -6,6 +6,7 @@
   <title>Sign In · Champions Connect</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="theme-color" content="#1a2744">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
@@ -330,11 +331,7 @@
   <div class="left-panel">
     <div class="left-top">
       <div class="brand">
-        <div class="brand-icon">✝</div>
-        <div>
-          <div class="brand-text">Champions Connect</div>
-          <div class="brand-sub">RCCG Champions Parish</div>
-        </div>
+        <img src="{{ url_for('static', filename='img/logo-horizontal-white.png') }}" alt="Champions Parish" style="height:38px;width:auto;">
       </div>
 
       <div class="hero-text">
@@ -398,6 +395,9 @@
       </div>
       <div class="footer-link" style="margin-top:8px;">
         Just want to give? <a href="{{ url_for('giving.give_page') }}">Give online without an account</a>
+      </div>
+      <div class="footer-link" style="margin-top:8px;">
+        <a href="{{ url_for('contact_page') }}">Contact Us</a>
       </div>
     </div>
   </div>

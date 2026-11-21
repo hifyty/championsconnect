@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Champions Connect{% endblock %} · Church Management</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎵</text></svg>">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
   <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
   <meta name="theme-color" content="#1a2744">
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
@@ -21,7 +21,7 @@
 <!-- SIDEBAR -->
 <aside class="sidebar" id="sidebar">
   <div class="sidebar-logo">
-    <div class="logo-icon">✝️</div>
+    <img src="{{ url_for('static', filename='img/logo-emblem.png') }}" alt="Champions Parish" class="logo-icon-img">
     <h1>Champions<br>Connect</h1>
     <span>Edmonton</span>
   </div>
@@ -38,6 +38,9 @@
     </a>
     <a href="{{ url_for('events') }}" class="nav-link {% if request.endpoint in ['events','event_detail'] %}active{% endif %}">
       <span class="nav-icon">📅</span> <span>Events</span>
+    </a>
+    <a href="{{ url_for('contact_page') }}" class="nav-link {% if request.endpoint=='contact_page' %}active{% endif %}">
+      <span class="nav-icon">📞</span> <span>Contact Us</span>
     </a>
 
     <!-- PEOPLE — all admins -->
