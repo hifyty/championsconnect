@@ -927,6 +927,15 @@ def init_db():
         except Exception:
             pass  # Column already exists
 
+    # Migration: seed the Zoe Young Adults giving category if it's not there yet
+    try:
+        if not _exec(db, "SELECT id FROM finance_categories WHERE name='Zoe Young Adults'").fetchone():
+            _exec(db, "INSERT INTO finance_categories (name,description,color) VALUES (?,?,?)",
+                  ('Zoe Young Adults', 'Giving designated for the Zoe Young Adults ministry', '#8b5cf6'))
+            db.commit()
+    except Exception:
+        pass
+
     # Migration: add new columns to users if they don't exist yet
     for col, definition in [
         ('has_seen_welcome',      'INTEGER DEFAULT 0'),
@@ -4215,6 +4224,23 @@ def church_settings_page():
 # ─────────────────────────────────────────────
 # PUBLIC CONTACT PAGE -- no login required
 # ─────────────────────────────────────────────
+
+@app.route('/young-adults')
+def young_adults_page():
+    """Public: Zoe Young Adults ministry page -- no login required, same
+    reasoning as /contact. Admins tag a normal event 'Zoe Young Adults' in
+    the Event Type field, or a news post 'zoe' in its category, and it
+    shows up here automatically -- no separate admin screen needed."""
+    upcoming = query_db(
+        "SELECT * FROM events WHERE event_type='Zoe Young Adults' AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5")
+    posts = query_db(
+        "SELECT * FROM news_posts WHERE category='zoe' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
+    zoe_category = query_db("SELECT * FROM finance_categories WHERE name='Zoe Young Adults'", one=True)
+    settings = get_church_settings()
+    return render_template('zoe.html', upcoming=upcoming, posts=posts,
+                            zoe_category=zoe_category, settings=settings,
+                            is_logged_in=('user_id' in session))
+
 
 @app.route('/contact')
 def contact_page():

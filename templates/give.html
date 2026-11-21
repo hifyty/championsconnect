@@ -31,7 +31,7 @@
           <select name="category_id">
             <option value="">General Giving</option>
             {% for c in categories %}
-            <option value="{{ c.id }}">{{ c.name }}</option>
+            <option value="{{ c.id }}" {% if request.args.get('category_id')|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
             {% endfor %}
           </select>
         </div>
