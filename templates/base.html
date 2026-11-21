@@ -31,7 +31,7 @@
     <!-- MAIN — everyone -->
     <div class="nav-section-label">Main</div>
     <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint=='dashboard' %}active{% endif %}">
-      <span class="nav-icon">🏠</span> <span>Dashboard</span>
+      <span class="nav-icon">📊</span> <span>Dashboard</span>
     </a>
     <a href="{{ url_for('news') }}" class="nav-link {% if request.endpoint in ['news','news_post_detail'] %}active{% endif %}">
       <span class="nav-icon">📰</span> <span>News & Blog</span>
@@ -117,10 +117,7 @@
       <span class="nav-icon">💬</span> <span>SMS Settings</span>
     </a>
     {% endif %}
-
-    <!-- ADMIN SETTINGS — super admin only -->
-    {% set _sa = session.get('role') in ['super_admin','admin'] %}{% if _sa %}
-    <div class="nav-section-label">⚙️ Settings</div>
+    {% if session.get('role') in ['super_admin','admin'] %}
     <a href="{{ url_for('social_settings') }}" class="nav-link {% if request.endpoint=='social_settings' %}active{% endif %}">
       <span class="nav-icon">📱</span> <span>Social Media Feeds</span>
     </a>
@@ -132,23 +129,17 @@
       <span class="nav-icon">🏠</span> <span>House Fellowships</span>
     </a>
     {% if session.get('role') in ['super_admin','admin'] %}
-    <a href="{{ url_for('fellowship_new') }}" class="nav-link {% if request.endpoint=='fellowship_new' %}active{% endif %}">
-      <span class="nav-icon">➕</span> <span>New Fellowship</span>
+    <a href="{{ url_for('fellowship_transfer_list') }}" class="nav-link {% if request.endpoint=='fellowship_transfer_list' %}active{% endif %}">
+      <span class="nav-icon">🔄</span> <span>Fellowship Transfers</span>
     </a>
+    {% endif %}
     {% if session.get('role') == 'super_admin' %}
     <div class="nav-section-label">⚙️ Admin</div>
     <a href="{{ url_for('church_settings_page') }}" class="nav-link {% if request.endpoint=='church_settings_page' %}active{% endif %}">
       <span class="nav-icon">🏛️</span> <span>Church Settings</span>
     </a>
-    <a href="{{ url_for('admin_users') }}" class="nav-link {% if request.endpoint=='admin_users' %}active{% endif %}">
-      <span class="nav-icon">👑</span> <span>Users & Roles</span>
-    </a>
     <a href="{{ url_for('audit_log_page') }}" class="nav-link {% if request.endpoint=='audit_log_page' %}active{% endif %}">
       <span class="nav-icon">🔍</span> <span>Audit Log</span>
-    </a>
-    {% endif %}
-    <a href="{{ url_for('fellowship_transfer_list') }}" class="nav-link {% if request.endpoint=='fellowship_transfer_list' %}active{% endif %}">
-      <span class="nav-icon">↔</span> <span>Transfers</span>
     </a>
     {% endif %}
 

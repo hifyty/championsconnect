@@ -2,7 +2,7 @@
 {% block title %}House Fellowships{% endblock %}
 {% block page_title %}House Fellowships{% endblock %}
 {% block topbar_actions %}
-  {% if session.get('role') in ['super_admin','admin'] %}
+  {% if session.get('role') == 'super_admin' %}
   <a href="{{ url_for('fellowship_new') }}" class="btn btn-primary">➕ New Fellowship</a>
   {% endif %}
 {% endblock %}
@@ -37,7 +37,7 @@
 <div class="empty-state">
   <div class="icon">🏠</div>
   <p>No house fellowships yet.</p>
-  {% if session.get('role') in ['super_admin','admin'] %}
+  {% if session.get('role') == 'super_admin' %}
   <a href="{{ url_for('fellowship_new') }}" class="btn btn-primary mt-1">Create First Fellowship</a>
   {% endif %}
 </div>
