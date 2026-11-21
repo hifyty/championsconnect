@@ -4225,6 +4225,41 @@ def church_settings_page():
 # PUBLIC CONTACT PAGE -- no login required
 # ─────────────────────────────────────────────
 
+@app.route('/calendar')
+def public_calendar():
+    """Public, read-only events list -- no login. The existing /events page
+    stays exactly as-is (login_required, with admin create/edit/delete
+    controls); this is a separate, stripped-down view for visitors and the
+    public app shell, reusing the same query."""
+    upcoming = query_db("SELECT * FROM events WHERE event_date>=date('now') ORDER BY event_date ASC")
+    settings = get_church_settings()
+    return render_template('events_public.html', upcoming=upcoming, settings=settings,
+                            is_logged_in=('user_id' in session))
+
+
+@app.route('/updates')
+def public_updates():
+    """Public, read-only announcements/news feed -- no login. Mirrors
+    /news's query (published posts only) but with none of the admin
+    posting/commenting controls."""
+    posts = query_db("""SELECT np.*,u.first_name,u.last_name FROM news_posts np
+        LEFT JOIN users u ON np.created_by=u.id WHERE np.is_published=1
+        ORDER BY np.pinned DESC,np.created_at DESC LIMIT 30""")
+    settings = get_church_settings()
+    return render_template('news_public.html', posts=posts, settings=settings,
+                            is_logged_in=('user_id' in session))
+
+
+@app.route('/ministries')
+def ministries_page():
+    """Public ministries overview -- no login. Links out to the ministries
+    that have their own dedicated page (Zoe Young Adults) and gives the
+    rest a short description for now."""
+    settings = get_church_settings()
+    return render_template('ministries.html', settings=settings,
+                            is_logged_in=('user_id' in session))
+
+
 @app.route('/young-adults')
 def young_adults_page():
     """Public: Zoe Young Adults ministry page -- no login required, same

@@ -45,6 +45,9 @@
     <a href="{{ url_for('young_adults_page') }}" class="nav-link {% if request.endpoint=='young_adults_page' %}active{% endif %}">
       <span class="nav-icon">🧑‍🤝‍🧑</span> <span>Zoe Young Adults</span>
     </a>
+    <a href="{{ url_for('ministries_page') }}" class="nav-link {% if request.endpoint=='ministries_page' %}active{% endif %}">
+      <span class="nav-icon">⛪</span> <span>Ministries</span>
+    </a>
 
     <!-- PEOPLE — all admins -->
     {% set _sa = session.get('role') in ['super_admin','admin'] %}{% if _sa %}

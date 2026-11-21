@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ministries · Champions Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#1a2744">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Champions">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --navy: #1a2744; --gold: #c9a84c; --slate: #64748b; --ivory: #faf8f2; }
+    body { font-family: 'Inter', sans-serif; min-height: 100vh; background: var(--navy); }
+
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; flex-wrap: wrap; gap: 12px; }
+    .topbar nav { display: flex; gap: 18px; flex-wrap: wrap; }
+    .topbar nav a { color: rgba(255,255,255,.75); font-size: 0.85rem; font-weight: 500; text-decoration: none; }
+    .topbar nav a:hover { color: #fff; }
+    .topbar nav a.login { color: var(--gold); font-weight: 700; }
+
+    .wrap { max-width: 720px; margin: 0 auto; padding: 8px 20px 60px; }
+    .page-card { background: var(--ivory); border-radius: 20px; padding: 36px 32px; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.7rem; color: var(--navy); margin-bottom: 6px; }
+    .subtitle { font-size: 0.9rem; color: var(--slate); margin-bottom: 26px; line-height: 1.6; }
+
+    .min-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 560px) { .min-grid { grid-template-columns: 1fr; } }
+
+    .min-card {
+      border: 1.5px solid #e7e2d6; border-radius: 14px; padding: 18px;
+      text-decoration: none; display: block; color: inherit;
+      transition: border-color .15s;
+    }
+    .min-card.linked:hover { border-color: var(--navy); }
+    .min-icon { font-size: 1.5rem; margin-bottom: 8px; }
+    .min-title { font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 4px; }
+    .min-desc { font-size: 0.82rem; color: var(--slate); line-height: 1.5; margin-bottom: 8px; }
+    .min-link { font-size: 0.78rem; font-weight: 700; color: var(--navy); }
+    .min-soon { font-size: 0.75rem; color: #94a3b8; font-style: italic; }
+
+    .note { font-size: 0.78rem; color: var(--slate); margin-top: 24px; line-height: 1.6; text-align: center; }
+    .note a { color: var(--navy); font-weight: 600; text-decoration: none; }
+    .note a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="{{ url_for('static', filename='img/logo-horizontal-white.png') }}" alt="{{ settings.org_name or 'Champions Parish' }}" style="height:28px;width:auto;">
+    <nav>
+      <a href="{{ url_for('ministries_page') }}">Ministries</a>
+      <a href="{{ url_for('public_calendar') }}">Events</a>
+      <a href="{{ url_for('public_updates') }}">News</a>
+      <a href="{{ url_for('contact_page') }}">Contact</a>
+      <a href="{{ url_for('giving.give_page') }}">Give</a>
+      {% if is_logged_in %}<a class="login" href="{{ url_for('dashboard') }}">Dashboard</a>
+      {% else %}<a class="login" href="{{ url_for('login') }}">Log In</a>{% endif %}
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <div class="page-card">
+      <h1>Ministries</h1>
+      <p class="subtitle">A place to belong, wherever you are in life.</p>
+
+      <div class="min-grid">
+        <a class="min-card linked" href="{{ url_for('young_adults_page') }}">
+          <div class="min-icon">🧑‍🤝‍🧑</div>
+          <div class="min-title">Zoe Young Adults</div>
+          <div class="min-desc">Ages 17–35. Faith, community and real talk about life, 2nd/3rd/4th Sunday monthly.</div>
+          <div class="min-link">View page →</div>
+        </a>
+
+        <a class="min-card linked" href="{{ url_for('contact_page') }}">
+          <div class="min-icon">🧒</div>
+          <div class="min-title">Children's Ministry</div>
+          <div class="min-desc">Safe, supervised classes for kids every Sunday, with secure check-in and check-out for every class.</div>
+          <div class="min-link">Contact us to learn more →</div>
+        </a>
+
+        <div class="min-card">
+          <div class="min-icon">🎒</div>
+          <div class="min-title">Teenagers' Ministry</div>
+          <div class="min-desc">A space for teens to grow in faith alongside friends their own age.</div>
+          <div class="min-soon">Page coming soon</div>
+        </div>
+
+        <div class="min-card">
+          <div class="min-icon">🛡️</div>
+          <div class="min-title">Men of Valour</div>
+          <div class="min-desc">Fellowship and mentorship for the men of the parish.</div>
+          <div class="min-soon">Page coming soon</div>
+        </div>
+
+        <div class="min-card">
+          <div class="min-icon">👑</div>
+          <div class="min-title">Women of Zion</div>
+          <div class="min-desc">Encouragement and community for the women of the parish.</div>
+          <div class="min-soon">Page coming soon</div>
+        </div>
+
+        <div class="min-card">
+          <div class="min-icon">🙏</div>
+          <div class="min-title">Prayer Band</div>
+          <div class="min-desc">Dedicated to intercession and prayer for the church and community.</div>
+          <div class="min-soon">Page coming soon</div>
+        </div>
+      </div>
+
+      <p class="note"><a href="{{ url_for('contact_page') }}">Contact Us</a> · {{ settings.org_name or 'RCCG Champions Parish' }}</p>
+    </div>
+  </div>
+</body>
+</html>

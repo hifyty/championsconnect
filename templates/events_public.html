@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Events · Champions Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#1a2744">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Champions">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --navy: #1a2744; --gold: #c9a84c; --slate: #64748b; --ivory: #faf8f2; }
+    body { font-family: 'Inter', sans-serif; min-height: 100vh; background: var(--navy); }
+
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 18px 24px; flex-wrap: wrap; gap: 12px;
+    }
+    .topbar nav { display: flex; gap: 18px; flex-wrap: wrap; }
+    .topbar nav a { color: rgba(255,255,255,.75); font-size: 0.85rem; font-weight: 500; text-decoration: none; }
+    .topbar nav a:hover { color: #fff; }
+    .topbar nav a.login { color: var(--gold); font-weight: 700; }
+
+    .wrap { max-width: 720px; margin: 0 auto; padding: 8px 20px 60px; }
+    .page-card { background: var(--ivory); border-radius: 20px; padding: 36px 32px; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.7rem; color: var(--navy); margin-bottom: 6px; }
+    .subtitle { font-size: 0.9rem; color: var(--slate); margin-bottom: 26px; }
+
+    .ev-card {
+      display: flex; gap: 16px; padding: 16px 0;
+      border-bottom: 1px solid #e7e2d6;
+    }
+    .ev-card:last-child { border-bottom: none; }
+    .ev-date {
+      flex-shrink: 0; width: 58px; text-align: center;
+      background: rgba(26,39,68,.06); border-radius: 10px; padding: 8px 4px;
+    }
+    .ev-date .d { font-size: 1.25rem; font-weight: 700; color: var(--navy); line-height: 1; }
+    .ev-date .m { font-size: 0.68rem; text-transform: uppercase; color: var(--slate); letter-spacing: 0.5px; margin-top: 2px; }
+    .ev-title { font-size: 0.98rem; font-weight: 600; color: var(--navy); margin-bottom: 3px; }
+    .ev-meta { font-size: 0.8rem; color: var(--slate); margin-bottom: 4px; }
+    .ev-type {
+      display: inline-block; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.4px; color: var(--navy); background: rgba(201,168,76,.18);
+      border-radius: 999px; padding: 2px 9px; margin-bottom: 4px;
+    }
+    .ev-desc { font-size: 0.85rem; color: var(--slate); line-height: 1.5; }
+    .empty { font-size: 0.9rem; color: var(--slate); font-style: italic; padding: 10px 0; }
+
+    .note { font-size: 0.78rem; color: var(--slate); margin-top: 24px; line-height: 1.6; text-align: center; }
+    .note a { color: var(--navy); font-weight: 600; text-decoration: none; }
+    .note a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="{{ url_for('static', filename='img/logo-horizontal-white.png') }}" alt="{{ settings.org_name or 'Champions Parish' }}" style="height:28px;width:auto;">
+    <nav>
+      <a href="{{ url_for('ministries_page') }}">Ministries</a>
+      <a href="{{ url_for('public_calendar') }}">Events</a>
+      <a href="{{ url_for('public_updates') }}">News</a>
+      <a href="{{ url_for('contact_page') }}">Contact</a>
+      <a href="{{ url_for('giving.give_page') }}">Give</a>
+      {% if is_logged_in %}<a class="login" href="{{ url_for('dashboard') }}">Dashboard</a>
+      {% else %}<a class="login" href="{{ url_for('login') }}">Log In</a>{% endif %}
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <div class="page-card">
+      <h1>Upcoming Events</h1>
+      <p class="subtitle">What's happening at {{ settings.org_name or 'Champions Parish' }}.</p>
+
+      {% if upcoming %}
+        {% for ev in upcoming %}
+        <div class="ev-card">
+          <div class="ev-date">
+            <div class="d">{{ ev.event_date[8:10] }}</div>
+            <div class="m">{{ ev.event_date[5:7] }}/{{ ev.event_date[0:4] }}</div>
+          </div>
+          <div>
+            {% if ev.event_type %}<span class="ev-type">{{ ev.event_type }}</span><br>{% endif %}
+            <div class="ev-title">{{ ev.title }}</div>
+            <div class="ev-meta">
+              {% if ev.start_time %}{{ ev.start_time }}{% if ev.end_time %} – {{ ev.end_time }}{% endif %}{% endif %}
+              {% if ev.location %}{% if ev.start_time %} · {% endif %}{{ ev.location }}{% endif %}
+            </div>
+            {% if ev.description %}<div class="ev-desc">{{ ev.description }}</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty">No upcoming events posted yet — check back soon.</div>
+      {% endif %}
+
+      <p class="note"><a href="{{ url_for('contact_page') }}">Contact Us</a> · {{ settings.org_name or 'RCCG Champions Parish' }}</p>
+    </div>
+  </div>
+</body>
+</html>

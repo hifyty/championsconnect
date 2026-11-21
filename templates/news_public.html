@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>News & Announcements · Champions Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#1a2744">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Champions">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --navy: #1a2744; --gold: #c9a84c; --slate: #64748b; --ivory: #faf8f2; }
+    body { font-family: 'Inter', sans-serif; min-height: 100vh; background: var(--navy); }
+
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; flex-wrap: wrap; gap: 12px; }
+    .topbar nav { display: flex; gap: 18px; flex-wrap: wrap; }
+    .topbar nav a { color: rgba(255,255,255,.75); font-size: 0.85rem; font-weight: 500; text-decoration: none; }
+    .topbar nav a:hover { color: #fff; }
+    .topbar nav a.login { color: var(--gold); font-weight: 700; }
+
+    .wrap { max-width: 720px; margin: 0 auto; padding: 8px 20px 60px; }
+    .page-card { background: var(--ivory); border-radius: 20px; padding: 36px 32px; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.7rem; color: var(--navy); margin-bottom: 6px; }
+    .subtitle { font-size: 0.9rem; color: var(--slate); margin-bottom: 26px; }
+
+    .post { padding: 16px 0; border-bottom: 1px solid #e7e2d6; }
+    .post:last-child { border-bottom: none; }
+    .post-badge {
+      display: inline-block; font-size: 0.68rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.4px; border-radius: 999px; padding: 2px 9px; margin-bottom: 6px;
+    }
+    .post-badge.announcement { background: #eff6ff; color: #1e40af; }
+    .post-badge.event        { background: #f0fdf4; color: #166534; }
+    .post-badge.praise_report{ background: #fdf4ff; color: #7e22ce; }
+    .post-badge.zoe           { background: rgba(139,92,246,.12); color: #7c3aed; }
+    .post-badge.notice        { background: #f1f5f9; color: #475569; }
+    .post-title { font-size: 0.98rem; font-weight: 600; color: var(--navy); margin-bottom: 4px; }
+    .post-body { font-size: 0.87rem; color: var(--slate); line-height: 1.6; white-space: pre-line; }
+    .post-meta { font-size: 0.75rem; color: #94a3b8; margin-top: 6px; }
+    .empty { font-size: 0.9rem; color: var(--slate); font-style: italic; padding: 10px 0; }
+
+    .note { font-size: 0.78rem; color: var(--slate); margin-top: 24px; line-height: 1.6; text-align: center; }
+    .note a { color: var(--navy); font-weight: 600; text-decoration: none; }
+    .note a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="{{ url_for('static', filename='img/logo-horizontal-white.png') }}" alt="{{ settings.org_name or 'Champions Parish' }}" style="height:28px;width:auto;">
+    <nav>
+      <a href="{{ url_for('ministries_page') }}">Ministries</a>
+      <a href="{{ url_for('public_calendar') }}">Events</a>
+      <a href="{{ url_for('public_updates') }}">News</a>
+      <a href="{{ url_for('contact_page') }}">Contact</a>
+      <a href="{{ url_for('giving.give_page') }}">Give</a>
+      {% if is_logged_in %}<a class="login" href="{{ url_for('dashboard') }}">Dashboard</a>
+      {% else %}<a class="login" href="{{ url_for('login') }}">Log In</a>{% endif %}
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <div class="page-card">
+      <h1>News &amp; Announcements</h1>
+      <p class="subtitle">The latest from {{ settings.org_name or 'Champions Parish' }}.</p>
+
+      {% if posts %}
+        {% for p in posts %}
+        <div class="post">
+          <span class="post-badge {{ p.category or 'notice' }}">
+            {% if p.category=='announcement' %}📢 Announcement{% elif p.category=='event' %}📅 Event{% elif p.category=='praise_report' %}🙌 Praise Report{% elif p.category=='zoe' %}🧑‍🤝‍🧑 Zoe Young Adults{% else %}📝 Notice{% endif %}
+          </span>
+          <div class="post-title">{{ p.title }}</div>
+          <div class="post-body">{{ p.body }}</div>
+          {% if p.first_name %}<div class="post-meta">— {{ p.first_name }} {{ p.last_name }}</div>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+      <div class="empty">No announcements posted yet — check back soon.</div>
+      {% endif %}
+
+      <p class="note"><a href="{{ url_for('contact_page') }}">Contact Us</a> · {{ settings.org_name or 'RCCG Champions Parish' }}</p>
+    </div>
+  </div>
+</body>
+</html>
