@@ -10,6 +10,7 @@
     <div class="card-header"><div class="card-title">Post Announcement</div></div>
     <div class="card-body">
       <form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label class="form-label">Title *</label>
           <input type="text" name="title" class="form-control" required placeholder="Announcement title">
@@ -32,6 +33,7 @@
           <div style="font-weight:600;">{{ a.title }}</div>
           {% if session.get('role') in ['super_admin','admin'] %}
           <form method="POST" action="{{ url_for('fellowship_delete_announcement', fellowship_id=hf.id, ann_id=a.id) }}" onsubmit="return confirm('Delete this announcement?')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#dc2626;">✕</button>
           </form>
           {% endif %}

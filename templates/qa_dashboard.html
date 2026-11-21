@@ -66,10 +66,12 @@
               <a href="{{ url_for('qa_audience', code=s.join_code) }}" class="btn btn-xs btn-outline" target="_blank">👁️ Preview</a>
               {% if s.status == 'active' %}
               <form method="POST" action="{{ url_for('qa_close', session_id=s.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-xs btn-danger">⏹ Close</button>
               </form>
               {% else %}
               <form method="POST" action="{{ url_for('qa_reopen', session_id=s.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-xs btn-outline">▶️ Reopen</button>
               </form>
               {% endif %}
@@ -125,6 +127,7 @@
       <button class="modal-close" onclick="closeModal('createSessionModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('qa_create') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Session Title *</label>

@@ -15,6 +15,7 @@
       </div>
       {% else %}
       <form method="POST" action="{{ url_for('giving.give_checkout') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label>Amount (CAD) *</label>
           <input type="number" name="amount" min="1" step="0.01" required placeholder="e.g. 50.00" autofocus>

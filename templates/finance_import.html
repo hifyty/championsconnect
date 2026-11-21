@@ -45,6 +45,7 @@
     <div class="card-header"><div class="card-title">📥 Upload CSV File</div></div>
     <div class="card-body">
       <form method="POST" action="{{ url_for('finance_import') }}" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label>Import Format</label>
           <select name="import_type" style="padding:10px 14px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.9rem;width:100%;" id="importType" onchange="showFormat(this.value)">

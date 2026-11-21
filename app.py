@@ -23,6 +23,23 @@ app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 DATABASE = os.path.join(os.path.dirname(__file__), 'church.db')
 
+# CSRF protection on every POST/PUT/PATCH/DELETE request -- every <form> in
+# templates/ carries a hidden csrf_token field (added app-wide; see git log).
+# Three endpoints are deliberately exempted below because they can't carry a
+# form-rendered token: a Stripe server-to-server webhook, and two JS fetch()
+# calls that have their own narrower protections (unique-constraint on
+# votes/likes, and the QA join flow is meant to be usable by anyone with the
+# join code, logged in or not).
+from flask_wtf import CSRFProtect
+csrf = CSRFProtect(app)
+
+# Rate limiting -- mainly to slow down brute-force login attempts. In-memory
+# storage is fine here since Render's free-tier Procfile runs a single
+# gunicorn worker (no shared state needed across processes).
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+limiter = Limiter(key_func=get_remote_address, app=app, default_limits=[])
+
 
 # ─────────────────────────────────────────────
 # DATABASE HELPERS
@@ -214,6 +231,7 @@ def _exec_script(db, sql):
 # the way one dropped line in this file once broke every login page.
 from blueprints.giving import giving_bp
 app.register_blueprint(giving_bp)
+csrf.exempt(app.view_functions['giving.give_webhook'])  # Stripe server-to-server call, no session/form
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -299,6 +317,7 @@ def init_db():
             pending_fellowship_id INTEGER,
             phone TEXT,
             reason_for_joining TEXT,
+            account_status TEXT DEFAULT 'active',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
@@ -943,6 +962,7 @@ def init_db():
         ('pending_fellowship_id','INTEGER'),
         ('phone',                'TEXT'),
         ('reason_for_joining',   'TEXT'),
+        ('account_status',       "TEXT DEFAULT 'active'"),
     ]:
         try:
             _exec(db, f"ALTER TABLE users ADD COLUMN {col} {definition}")
@@ -1171,6 +1191,21 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated
 
+@app.before_request
+def _force_default_password_change():
+    """If this session logged in with the published default admin
+    credential, lock navigation to Church Settings (where they can change
+    it) and logout, until it's rotated. Static assets, the webhook, and
+    public pages stay reachable so the rest of the site keeps working for
+    everyone else while the admin fixes this."""
+    if not session.get('force_password_change'):
+        return
+    allowed = {'church_settings_page', 'admin_change_own_password', 'logout', 'static', None}
+    if request.endpoint in allowed or (request.endpoint or '').startswith('giving.'):
+        return
+    flash('Please change the default admin password before continuing.', 'danger')
+    return redirect(url_for('church_settings_page'))
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
@@ -1259,12 +1294,16 @@ def inject_globals():
 # ─────────── AUTH ROUTES ───────────
 
 @app.route('/login', methods=['GET','POST'])
+@limiter.limit("10 per minute", methods=["POST"])
 def login():
     if 'user_id' in session:
         return redirect(url_for('dashboard'))
     if request.method == 'POST':
         email = request.form.get('email','').strip().lower()
         user  = query_db("SELECT * FROM users WHERE email=?", [email], one=True)
+        if user and user['account_status'] == 'deleted':
+            flash('This account has been deleted.', 'danger')
+            return render_template('login.html')
         if user and user['password_hash'] == hash_password(request.form.get('password','')):
             session['user_id'] = user['id']
             session['role']    = user['role']
@@ -1275,13 +1314,22 @@ def login():
                 WHERE (m.user_id=? OR m.email=?) AND cm.is_active=1""",
                 [user['id'], user['email']], one=True)
             session['is_choir_member'] = choir_check is not None
-            flash(f"Welcome back, {user['first_name']}! 🙌",'success')
             audit('LOGIN', 'user', user['id'], f"{user['first_name']} {user['last_name']}")
+            # Published default credential (used to live in plain text in the
+            # README) -- force a password change before anything else, every
+            # time, until it's actually rotated. Doesn't touch the DB; purely
+            # a login-time check against the known default hash.
+            if user['password_hash'] == hash_password('admin123') and user['email'] == 'admin@championschoir.ca':
+                session['force_password_change'] = True
+                flash('You are signed in with the published default password. For security, please change it now before continuing.', 'danger')
+                return redirect(url_for('church_settings_page'))
+            flash(f"Welcome back, {user['first_name']}! 🙌",'success')
             return redirect(url_for('dashboard'))
         flash('Invalid email or password.','danger')
     return render_template('login.html')
 
 @app.route('/signup', methods=['GET','POST'])
+@limiter.limit("10 per minute", methods=["POST"])
 def signup():
     fellowships = query_db("SELECT id, name FROM house_fellowships WHERE is_active=1 ORDER BY name")
     if request.method == 'POST':
@@ -1342,6 +1390,7 @@ def signup():
 
         if notify_emails:
             app_url = request.host_url.rstrip('/')
+            cs = get_church_settings()  # pre-existing bug: this was referenced below but never assigned, so this email 500'd on every signup
             fellowship_name = joined_fellowship['name'] if joined_fellowship else 'None selected'
             email_html = f"""
             <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;">
@@ -2134,7 +2183,7 @@ def member_portal():
         total_given = query_db("SELECT COALESCE(SUM(amount),0) as t FROM donations WHERE member_id=?",
             [member['id']], one=True)['t']
         attendance_rate = query_db("""
-            SELECT COUNT(*) as total,
+            SELECT COUNT(*) as total_services,
                    SUM(CASE WHEN status='present' THEN 1 ELSE 0 END) as present
             FROM service_attendance WHERE member_id=?""", [member['id']], one=True)
         # Fellowship info
@@ -2183,6 +2232,36 @@ def member_portal():
         fellowship_prayer=fellowship_prayer,
         pending_transfer=pending_transfer,
         all_fellowships=all_fellowships)
+
+
+@app.route('/portal/delete-account', methods=['POST'])
+@login_required
+def delete_my_account():
+    """Self-service account deletion, required by app store policies. We
+    deliberately don't hard-delete the users/members rows: donation records
+    reference member_id and churches are required to keep those for CRA tax
+    receipt purposes even after someone leaves. Instead this disables login
+    (random unusable password hash + account_status='deleted') and clears
+    optional personal-contact fields, while giving/attendance history stays
+    intact and attributed. An admin can still see the member record if
+    historical donations need to be reconciled, but the person can never log
+    in again and their phone/reason-for-joining are wiped."""
+    user = get_current_user()
+    if not user or user['password_hash'] != hash_password(request.form.get('password', '')):
+        flash('Incorrect password — account not deleted.', 'danger')
+        return redirect(url_for('member_portal'))
+
+    execute_db("""UPDATE users SET
+        account_status='deleted',
+        password_hash=?,
+        phone=NULL,
+        reason_for_joining=NULL
+        WHERE id=?""", [hash_password(secrets.token_hex(32)), user['id']])
+    audit('ACCOUNT_DELETED', 'user', user['id'], f"{user['first_name']} {user['last_name']}",
+          'Self-service deletion from Member Portal')
+    session.clear()
+    flash('Your account has been deleted. Giving records are retained for tax purposes as explained.', 'info')
+    return redirect(url_for('login'))
 
 
 # ─────────── PASSWORD MANAGEMENT ───────────
@@ -3310,6 +3389,8 @@ def news_post_detail(post_id):
         user_liked=bool(user_liked), like_count=like_count)
 
 @app.route('/news/<int:post_id>/like', methods=['POST'])
+@csrf.exempt  # called via fetch(), not a <form> -- protected instead by the
+              # post_id+user_id unique constraint and @login_required
 @login_required
 def toggle_like(post_id):
     uid = session.get('user_id')
@@ -3607,6 +3688,7 @@ def qa_manage(session_id):
     return render_template('qa_manage.html', qa_s=qa_s, questions=questions)
 
 @app.route('/qa/question/<int:q_id>/action', methods=['POST'])
+@csrf.exempt  # called via fetch() from the moderator dashboard, not a <form>
 @login_required
 def qa_question_action(q_id):
     action = request.form.get('action')
@@ -3661,6 +3743,8 @@ def qa_audience(code):
     return render_template('qa_audience.html', qa_s=qa_s, questions=questions)
 
 @app.route('/qa/<code>/submit', methods=['POST'])
+@csrf.exempt  # public, anonymous-by-design submission via a join code --
+              # there's no login session for a CSRF token to protect
 def qa_submit(code):
     """Public question submission"""
     qa_s = query_db("SELECT * FROM qa_sessions WHERE join_code=?", [code.upper()], one=True)
@@ -3689,6 +3773,8 @@ def qa_questions_feed(code):
     return jsonify([dict(q) for q in questions])
 
 @app.route('/qa/<code>/vote', methods=['POST'])
+@csrf.exempt  # anonymous audience voting, protected instead by the
+              # UNIQUE(question_id, voter_token) constraint
 def qa_vote(code):
     """Anonymous vote — tracked by browser token stored in cookie"""
     q_id  = request.json.get('question_id') if request.is_json else request.form.get('question_id')
@@ -4277,6 +4363,14 @@ def young_adults_page():
                             is_logged_in=('user_id' in session))
 
 
+@app.route('/privacy')
+def privacy_page():
+    """Public privacy policy -- required for both app store listings."""
+    settings = get_church_settings()
+    return render_template('privacy.html', settings=settings,
+                            is_logged_in=('user_id' in session))
+
+
 @app.route('/contact')
 def contact_page():
     """Public Contact Us page. Anyone can view it, logged in or not --
@@ -4306,6 +4400,7 @@ def admin_change_own_password():
         execute_db("UPDATE users SET password_hash=? WHERE id=?",
             [hash_password(new_pw), session['user_id']])
         audit('PASSWORD_CHANGED', 'user', session.get('user_id'), 'Admin password change')
+        session.pop('force_password_change', None)
         flash('Password updated successfully! ✅', 'success')
     return redirect(url_for('church_settings_page'))
 

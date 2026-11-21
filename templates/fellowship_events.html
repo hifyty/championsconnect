@@ -21,6 +21,7 @@
             {% if e.description %}<div class="fs-sm" style="margin-top:4px;">{{ e.description }}</div>{% endif %}
           </div>
           <form method="POST" action="{{ url_for('fellowship_delete_event', fellowship_id=hf.id, event_id=e.id) }}" onsubmit="return confirm('Delete this event?')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#dc2626;">✕</button>
           </form>
         </div>
@@ -55,6 +56,7 @@
       <button onclick="closeModal('newEventModal')" class="modal-close">✕</button>
     </div>
     <form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Event Title *</label>

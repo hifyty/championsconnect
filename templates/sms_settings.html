@@ -43,6 +43,7 @@
     <div class="card-header"><div class="card-title">⚙️ Twilio Credentials</div></div>
     <div class="card-body">
       <form method="POST" action="{{ url_for('sms_settings_page') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label>Account SID</label>
           <input type="text" name="twilio_account_sid"

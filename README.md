@@ -169,7 +169,7 @@ Designed for Python/Flask. Upload code, configure WSGI file, done.
 
 - [ ] **Create `Procfile`** in project root: `web: python app.py`
 - [ ] **Create `requirements.txt`**: `flask` and `reportlab` on separate lines
-- [ ] **Change admin password** from `admin123` — do this first
+- [x] **Default admin password is now forced to change on first login** (handled automatically by the app — no action needed)
 - [ ] **Configure SMTP email** so new member notifications work
   - Gmail App Password is easiest and free
   - Guide: myaccount.google.com → Security → 2-Step Verification → App Passwords
@@ -209,9 +209,10 @@ python3 app.py
 # Access at
 http://localhost:5001
 
-# Default admin login
-Email:    admin@championschoir.ca
-Password: admin123
+# First login: email admin@championschoir.ca, with the password set up for
+# your deployment. The app now forces a password change on first login if
+# it's still on the original seeded default, so there's no live default
+# credential published here.
 ```
 
 ---

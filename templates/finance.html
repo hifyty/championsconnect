@@ -92,6 +92,7 @@
                   Edit
                 </button>
                 <form method="POST" action="{{ url_for('delete_donation', donation_id=d.id) }}" onsubmit="return confirm('Delete this donation record?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-xs btn-danger">✕</button>
                 </form>
               </div>
@@ -151,6 +152,7 @@
       <button class="modal-close" onclick="closeModal('editDonationModal')">✕</button>
     </div>
     <form id="editDonationForm" method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group">
@@ -221,6 +223,7 @@
       <button class="modal-close" onclick="closeModal('addDonationModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_donation') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group">
@@ -291,6 +294,7 @@
       <button class="modal-close" onclick="closeModal('addExpenseModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_expense') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Description *</label>

@@ -104,6 +104,7 @@
           </div>
           {% if session.get('role') in ['super_admin','admin','content_admin'] %}
           <form method="POST" action="{{ url_for('delete_news', post_id=post.id) }}" onsubmit="return confirm('Delete this post?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-xs btn-danger">✕ Delete</button>
           </form>
           {% endif %}
@@ -128,6 +129,7 @@
     <h3 style="font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--navy);">📱 Latest from Our Socials</h3>
     {% if session.get('role') in ['super_admin','admin'] %}
     <form method="POST" action="{{ url_for('social_refresh') }}" style="margin-left:auto;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-xs btn-outline">🔄 Refresh</button>
     </form>
     {% endif %}
@@ -178,6 +180,7 @@
           <td style="color:var(--slate);font-size:0.875rem;max-width:400px;">{{ v.verse_text[:120] }}{{ '...' if v.verse_text|length > 120 else '' }}</td>
           <td>
             <form method="POST" action="{{ url_for('delete_verse', verse_id=v.id) }}" onsubmit="return confirm('Remove verse?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-xs btn-danger">✕</button>
             </form>
           </td>
@@ -203,6 +206,7 @@
       <button class="modal-close" onclick="closeModal('addNewsModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_news') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Title *</label>
@@ -247,6 +251,7 @@
       <button class="modal-close" onclick="closeModal('scriptureModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('set_scripture') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group">
@@ -286,6 +291,7 @@
       <button class="modal-close" onclick="closeModal('addVerseModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_verse') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Reference *</label>

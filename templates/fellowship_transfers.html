@@ -38,9 +38,11 @@
             {% if r.status == 'pending' %}
             <div class="d-flex gap-1">
               <form method="POST" action="{{ url_for('fellowship_transfer_approve', req_id=r.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-success">✅ Approve</button>
               </form>
               <form method="POST" action="{{ url_for('fellowship_transfer_decline', req_id=r.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;">✕ Decline</button>
               </form>
             </div>

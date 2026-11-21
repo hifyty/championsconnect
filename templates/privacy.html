@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy · Champions Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#1a2744">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Champions">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --navy: #1a2744; --gold: #c9a84c; --slate: #64748b; --ivory: #faf8f2; }
+    body { font-family: 'Inter', sans-serif; min-height: 100vh; background: var(--navy); }
+
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 18px 24px; flex-wrap: wrap; gap: 12px; }
+    .topbar nav { display: flex; gap: 18px; flex-wrap: wrap; }
+    .topbar nav a { color: rgba(255,255,255,.75); font-size: 0.85rem; font-weight: 500; text-decoration: none; }
+    .topbar nav a:hover { color: #fff; }
+    .topbar nav a.login { color: var(--gold); font-weight: 700; }
+
+    .wrap { max-width: 720px; margin: 0 auto; padding: 8px 20px 60px; }
+    .page-card { background: var(--ivory); border-radius: 20px; padding: 36px 32px; }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--navy); margin-bottom: 6px; }
+    .updated { font-size: 0.8rem; color: var(--slate); margin-bottom: 26px; }
+    h2 { font-size: 1rem; color: var(--navy); margin: 22px 0 8px; }
+    p, li { font-size: 0.88rem; color: #334155; line-height: 1.7; }
+    ul { margin: 6px 0 6px 20px; }
+    a { color: var(--navy); font-weight: 600; }
+
+    .note { font-size: 0.78rem; color: var(--slate); margin-top: 24px; line-height: 1.6; text-align: center; }
+    .note a { color: var(--navy); font-weight: 600; text-decoration: none; }
+    .note a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="{{ url_for('static', filename='img/logo-horizontal-white.png') }}" alt="{{ settings.org_name or 'Champions Parish' }}" style="height:28px;width:auto;">
+    <nav>
+      <a href="{{ url_for('ministries_page') }}">Ministries</a>
+      <a href="{{ url_for('contact_page') }}">Contact</a>
+      {% if is_logged_in %}<a class="login" href="{{ url_for('dashboard') }}">Dashboard</a>
+      {% else %}<a class="login" href="{{ url_for('login') }}">Log In</a>{% endif %}
+    </nav>
+  </div>
+
+  <div class="wrap">
+    <div class="page-card">
+      <h1>Privacy Policy</h1>
+      <p class="updated">Last updated: November 2026</p>
+
+      <p>This policy explains what information Champions Connect collects on behalf of
+      {{ settings.org_name or 'RCCG Champions Parish' }}, how it's used, and your choices. By
+      using the app or website, you agree to this policy.</p>
+
+      <h2>Information We Collect</h2>
+      <ul>
+        <li><strong>Account &amp; profile information:</strong> name, email, phone, address, and date of birth if you create an account or are added as a member.</li>
+        <li><strong>Giving records:</strong> donation amounts, dates, and designated funds, used to issue tax receipts and maintain financial records.</li>
+        <li><strong>Children's ministry information:</strong> a child's name, date of birth, allergy/medical notes, emergency contact, and an approved-pickup guardian list, entered by parents/guardians or staff for safety during check-in and check-out.</li>
+        <li><strong>Participation records:</strong> fellowship, choir, event, and attendance information.</li>
+        <li><strong>Questions &amp; prayer requests</strong> submitted through the app, including anonymous Q&amp;A during live sessions.</li>
+        <li><strong>Basic usage/audit logs</strong> (who did what, when) for security and accountability.</li>
+      </ul>
+
+      <h2>How We Use Your Information</h2>
+      <ul>
+        <li>To run ministry programs, events, and giving.</li>
+        <li>To issue official donation tax receipts.</li>
+        <li>To keep children safe during check-in and check-out.</li>
+        <li>To send email or SMS updates you'd reasonably expect (announcements, duty reminders).</li>
+        <li>To maintain records we're legally required to keep.</li>
+      </ul>
+
+      <h2>Payment Processing</h2>
+      <p>Online giving is processed by Stripe. Champions Connect never sees or stores your
+      card number — Stripe's secure checkout handles that, and only the resulting donation
+      amount and date are recorded here.</p>
+
+      <h2>Children's Information</h2>
+      <p>Information about children is entered by a parent/guardian or authorized staff member,
+      not by children themselves. Access is limited to Children's Ministry staff and
+      administrators, and is used solely to keep children safe during drop-off and pickup.
+      We retain it only as long as the child is active in the program, plus a reasonable
+      period after.</p>
+
+      <h2>Sharing Your Information</h2>
+      <p>We do not sell your information. It's shared only with the service providers that
+      help us run the app (payment processing, email/SMS delivery, hosting and database
+      providers) and only as needed to provide the service, or when required by law — for
+      example, maintaining donation records for CRA charitable tax receipt purposes.</p>
+
+      <h2>Data Retention</h2>
+      <p>Donation records are retained as required for tax and charitable-registration
+      purposes. Other personal information is retained while your account or your child's
+      enrollment is active, and for a reasonable period afterward, or until you request
+      deletion as described below.</p>
+
+      <h2>Your Choices</h2>
+      <p>You can review and update your information from your Member Portal at any time.
+      You can request deletion of your account from Member Portal → Account Settings →
+      Delete My Account. Because charities are required to retain donation records for tax
+      purposes, giving history stays on file even after an account is deleted, but your login
+      access and optional contact details are removed. For any other request — including
+      questions about your child's information — contact us using the details on our
+      <a href="{{ url_for('contact_page') }}">Contact Us</a> page.</p>
+
+      <h2>Security</h2>
+      <p>Passwords are stored as one-way hashes, not plain text. Forms are protected against
+      cross-site request forgery, and login attempts are rate-limited to slow down abuse.
+      No system is perfectly secure, but we take reasonable, standard precautions.</p>
+
+      <h2>Children's Online Privacy</h2>
+      <p>This app is not directed at children and is not intended for direct use by children.
+      Information about children in our Children's Ministry program is entered and managed
+      by parents, guardians, and authorized staff on the child's behalf.</p>
+
+      <h2>Changes to This Policy</h2>
+      <p>We may update this policy from time to time. The "last updated" date above will
+      reflect the most recent revision.</p>
+
+      <h2>Contact Us</h2>
+      <p>Questions about this policy or your information? Reach us via our
+      <a href="{{ url_for('contact_page') }}">Contact Us</a> page{% if settings.admin_email %} or at
+      <a href="mailto:{{ settings.admin_email }}">{{ settings.admin_email }}</a>{% endif %}.</p>
+
+      <p class="note">{{ settings.org_name or 'RCCG Champions Parish' }}</p>
+    </div>
+  </div>
+</body>
+</html>

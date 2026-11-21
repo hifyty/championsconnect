@@ -50,6 +50,7 @@
       {% if session.get('role') in ['super_admin','admin'] %}
       <form method="POST" action="{{ url_for('delete_children_class', class_id=c.id) }}"
             onsubmit="return confirm('Deactivate this class? Children already assigned stay on record.')" style="margin-top:12px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-sm btn-outline" style="color:#b91c1c;border-color:#fecaca;">Deactivate Class</button>
       </form>
       {% endif %}
@@ -73,6 +74,7 @@
       <button class="modal-close" onclick="closeModal('addClassModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_children_class') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Class Name *</label>

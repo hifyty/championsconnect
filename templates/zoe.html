@@ -130,9 +130,9 @@
 
     <div class="cta-row">
       {% if zoe_category %}
-      <a class="btn-give" href="{{ url_for('giving.give_page', category_id=zoe_category.id) }}">💜 Give to Zoe Young Adults</a>
+      <a class="btn-give" href="{{ url_for('giving.give_page', category_id=zoe_category.id) }}" data-open-external>💜 Give to Zoe Young Adults</a>
       {% else %}
-      <a class="btn-give" href="{{ url_for('giving.give_page') }}">💳 Give Online</a>
+      <a class="btn-give" href="{{ url_for('giving.give_page') }}" data-open-external>💳 Give Online</a>
       {% endif %}
       {% if not is_logged_in %}
       <a class="btn-outline" href="{{ url_for('login') }}">Log In to Champions Connect</a>
@@ -144,6 +144,7 @@
     <p class="note"><a href="{{ url_for('ministries_page') }}">Ministries</a> · <a href="{{ url_for('public_calendar') }}">Events</a> · <a href="{{ url_for('public_updates') }}">News</a></p>
     <p class="note"><a href="{{ url_for('contact_page') }}">Contact Us</a> · Champions Connect</p>
   </div>
+<script src="{{ url_for('static', filename='js/capacitor-bridge.js') }}"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

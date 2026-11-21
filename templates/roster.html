@@ -45,6 +45,7 @@
             </button>
             {% endif %}
             <form method="POST" action="{{ url_for('delete_duty', duty_id=duty.id) }}" style="margin-left:auto;" onsubmit="return confirm('Remove this duty?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-xs btn-danger">✕</button>
             </form>
           </div>
@@ -111,6 +112,7 @@
       <button class="modal-close" onclick="closeModal('addDutyModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_duty') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Member *</label>
@@ -172,6 +174,7 @@
 
       <!-- SEND NOW -->
       <form method="POST" action="{{ url_for('send_reminder_now') }}" style="margin-bottom:20px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="duty_id" id="sendNowDutyId">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Send Immediately</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -187,6 +190,7 @@
       <div style="border-top:1px solid var(--ivory2);padding-top:18px;">
         <div style="font-size:0.78rem;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--slate);margin-bottom:8px;">Schedule for Later</div>
         <form method="POST" action="{{ url_for('schedule_reminder') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="duty_id" id="schedDutyId">
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
             <select name="remind_when" style="flex:1;padding:9px 12px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.875rem;">

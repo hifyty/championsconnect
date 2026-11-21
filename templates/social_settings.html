@@ -13,6 +13,7 @@
         <div class="fs-sm text-slate">Configured feeds appear in the News & Blog page for all members</div>
       </div>
       <form method="POST" action="{{ url_for('social_refresh') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-gold">🔄 Refresh Feeds Now</button>
       </form>
     </div>
@@ -28,6 +29,7 @@
     </div>
     <div class="card-body">
       <form method="POST" action="{{ url_for('social_settings') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="platform" value="facebook">
         <div class="form-group">
           <label>Page Handle / Name</label>
@@ -64,6 +66,7 @@
     </div>
     <div class="card-body">
       <form method="POST" action="{{ url_for('social_settings') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <input type="hidden" name="platform" value="instagram">
         <div class="form-group">
           <label>Instagram Handle</label>

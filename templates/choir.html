@@ -43,6 +43,7 @@
           </div>
           <form method="POST" action="{{ url_for('choir_remove_member', member_id=cm.member_id) }}"
                 onsubmit="return confirm('Remove {{ cm.first_name }} from choir?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-xs btn-danger">✕</button>
           </form>
         </div>
@@ -172,6 +173,7 @@
       <button class="modal-close" onclick="closeModal('addChoirMemberModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('choir_add_member') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Member *</label>

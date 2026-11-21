@@ -51,8 +51,9 @@ git push origin main
 ## Step 4 — Smoke test
 
 Once deployed, visit your Render URL and check, in order:
-1. `/login` loads and you can log in with `admin@championschoir.ca` / `admin123`
-   **— change this password immediately after confirming login works.**
+1. `/login` loads and you can log in as `admin@championschoir.ca` with the
+   seeded default password. The app will force you to change it on this
+   first login before letting you go anywhere else — just follow the prompt.
 2. The dashboard loads with no errors.
 3. Add a test member or donation, then check it actually shows up (confirms
    Postgres is really being written to, not just read).

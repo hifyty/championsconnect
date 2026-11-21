@@ -68,6 +68,7 @@
           <td>
             {% if not ci %}
             <form method="POST" action="{{ url_for('children_checkin', class_id=cls.id) }}" style="display:flex;gap:6px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <input type="hidden" name="child_id" value="{{ child.id }}">
               <select name="dropoff_guardian_id" style="padding:5px 8px;border:1.5px solid var(--ivory2);border-radius:6px;font-size:0.8rem;">
                 <option value="">Dropped off by...</option>
@@ -87,6 +88,7 @@
                   <button class="modal-close" onclick="closeModal('checkout-{{ ci.id }}')">✕</button>
                 </div>
                 <form method="POST" action="{{ url_for('children_checkout', checkin_id=ci.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <div class="modal-body">
                     <p class="fs-sm text-slate mb-1">Confirm the person picking up matches one of the approved guardians below.</p>
                     <div class="form-group">

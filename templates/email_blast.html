@@ -39,6 +39,7 @@
       </div>
       <div class="card-body">
         <form method="POST" action="{{ url_for('send_blast') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
             <label>Send To</label>
             <select name="target" style="padding:10px 14px;border:1.5px solid var(--ivory2);border-radius:7px;font-size:0.9rem;width:100%;">
@@ -88,6 +89,7 @@
 
         <div id="smtpForm" style="display:none;margin-top:14px;">
           <form method="POST" action="{{ url_for('save_email_settings') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;font-size:0.8rem;color:#92400e;margin-bottom:14px;">
               🔐 <strong>Gmail users:</strong> Use an <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color:#92400e;">App Password</a>, not your regular password. Enable 2FA first.
             </div>
@@ -141,6 +143,7 @@
               <td class="fs-sm">{{ m.email }}</td>
               <td>
                 <form method="POST" action="{{ url_for('toggle_mailing_list', member_id=m.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                   <button type="submit" class="btn btn-xs {% if m.on_mailing_list %}btn-success{% else %}btn-outline{% endif %}"
                     title="Click to toggle">
                     {{ '✅' if m.on_mailing_list else '○' }}

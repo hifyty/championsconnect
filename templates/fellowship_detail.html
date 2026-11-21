@@ -52,12 +52,14 @@
             {% if session.get('role') in ['super_admin','admin'] %}
             <td>
               <form method="POST" action="{{ url_for('fellowship_change_role', fellowship_id=hf.id, fm_id=m.id) }}" style="display:inline;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <select name="role" onchange="this.form.submit()" class="form-control" style="padding:4px 8px;font-size:0.75rem;width:auto;display:inline;">
                   <option value="member" {% if m.role=='member' %}selected{% endif %}>Member</option>
                   <option value="leader" {% if m.role=='leader' %}selected{% endif %}>Leader</option>
                 </select>
               </form>
               <form method="POST" action="{{ url_for('fellowship_remove_member', fellowship_id=hf.id, fm_id=m.id) }}" style="display:inline;" onsubmit="return confirm('Remove this member?')">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <button type="submit" class="btn btn-sm" style="background:#fee2e2;color:#dc2626;">✕</button>
               </form>
             </td>
@@ -148,6 +150,7 @@
       <button onclick="closeModal('addMemberModal')" class="modal-close">✕</button>
     </div>
     <form method="POST" action="{{ url_for('fellowship_add_member', fellowship_id=hf.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Select Member</label>

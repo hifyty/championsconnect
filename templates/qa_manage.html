@@ -28,10 +28,12 @@
     </div>
     {% if qa_s.status == 'active' %}
     <form method="POST" action="{{ url_for('qa_close', session_id=qa_s.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-sm btn-danger">⏹ Close Session</button>
     </form>
     {% else %}
     <form method="POST" action="{{ url_for('qa_reopen', session_id=qa_s.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <button type="submit" class="btn btn-sm btn-outline">▶️ Reopen</button>
     </form>
     {% endif %}

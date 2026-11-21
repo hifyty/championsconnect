@@ -98,7 +98,7 @@
     <a href="{{ url_for('finance') }}" class="nav-link {% if request.endpoint in ['finance','finance_import'] %}active{% endif %}">
       <span class="nav-icon">💰</span> <span>{% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}Donations & Finance{% else %}My Giving{% endif %}</span>
     </a>
-    <a href="{{ url_for('giving.give_page') }}" class="nav-link {% if request.endpoint=='giving.give_page' %}active{% endif %}">
+    <a href="{{ url_for('giving.give_page') }}" data-open-external class="nav-link {% if request.endpoint=='giving.give_page' %}active{% endif %}">
       <span class="nav-icon">💳</span> <span>Give Online</span>
     </a>
     {% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}
@@ -270,6 +270,7 @@ function toggleSidebar() {
 </script>
 
 {% block scripts %}{% endblock %}
+<script src="{{ url_for('static', filename='js/capacitor-bridge.js') }}"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

@@ -119,6 +119,7 @@
             <button class="btn btn-sm btn-gold" onclick="openMarkModal({{ r.id }}, '{{ r.title }}', '{{ r.rehearsal_date }}')">Mark Attendance</button>
             {% if session.get('role') == 'admin' %}
             <form method="POST" action="{{ url_for('delete_rehearsal', rehearsal_id=r.id) }}" onsubmit="return confirm('Delete rehearsal?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-danger">✕</button>
             </form>
             {% endif %}
@@ -146,6 +147,7 @@
       <button class="modal-close" onclick="closeModal('quickAttendanceModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('quick_service_attendance') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group">
@@ -192,6 +194,7 @@
       <button class="modal-close" onclick="closeModal('addRehearsalModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_rehearsal') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Title</label>
@@ -236,6 +239,7 @@
       <button class="modal-close" onclick="closeModal('markRehearsalModal')">✕</button>
     </div>
     <form id="markRehearsalForm" method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div style="margin-bottom:10px;font-size:0.82rem;color:var(--slate);">
           Check each member who was <strong>present</strong>.

@@ -83,6 +83,7 @@
           {% if session.get('role') in ['admin','finance'] %}
           <form method="POST" action="{{ url_for('delete_event', event_id=ev.id) }}"
                 style="margin-left:auto;" onsubmit="return confirm('Delete this event?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-xs btn-danger">Delete</button>
           </form>
           {% endif %}
@@ -142,6 +143,7 @@
       <button class="modal-close" onclick="closeModal('addEventModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_event') }}" enctype="multipart/form-data">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label>Event Title *</label>

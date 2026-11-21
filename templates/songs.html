@@ -53,6 +53,7 @@
         <button class="btn btn-sm btn-outline" onclick="openEditSong({{ song.id }}, '{{ song.title|replace("'","\\'") }}', '{{ song.artist or '' }}', '{{ song.key_signature or '' }}', '{{ song.tempo or '' }}', '{{ song.genre or '' }}', '{{ song.youtube_url or '' }}', '{{ song.lyrics_notes|replace("'","\\'") if song.lyrics_notes else '' }}', '{{ song.status }}')">Edit</button>
         {% if session.get('role') == 'admin' %}
         <form method="POST" action="{{ url_for('delete_song', song_id=song.id) }}" onsubmit="return confirm('Remove song?');" style="margin-left:auto;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <button type="submit" class="btn btn-xs btn-danger">✕</button>
         </form>
         {% endif %}
@@ -78,6 +79,7 @@
       <button class="modal-close" onclick="closeModal('addSongModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('add_song') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group">
@@ -151,6 +153,7 @@
       <button class="modal-close" onclick="closeModal('editSongModal')">✕</button>
     </div>
     <form id="editSongForm" method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-row">
           <div class="form-group">

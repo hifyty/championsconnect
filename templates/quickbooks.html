@@ -25,6 +25,7 @@
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       {% if settings and settings.is_connected %}
       <form method="POST" action="{{ url_for('qb_disconnect') }}" onsubmit="return confirm('Disconnect QuickBooks?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-outline btn-sm">Disconnect</button>
       </form>
       {% else %}
@@ -50,6 +51,7 @@
         Import data from QuickBooks into Champions Connect. New records only — won't overwrite existing matched data.
       </p>
       <form method="POST" action="{{ url_for('qb_sync_from_qb') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
           {% for val, label, desc in [
             ('customers',      '👥 Customers → Members',           'Import QB customers as choir members'),
@@ -81,6 +83,7 @@
         Push data from Champions Connect to QuickBooks. Only pushes records not yet in QB (checks for QB ID).
       </p>
       <form method="POST" action="{{ url_for('qb_sync_to_qb') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;">
           {% for val, label, desc in [
             ('members',   '👥 Members → QB Customers',       'Create new members as QB customers'),
@@ -113,6 +116,7 @@
     <div class="card-header"><div class="card-title">⚙️ QuickBooks Credentials</div></div>
     <div class="card-body">
       <form method="POST" action="{{ url_for('qb_save_settings') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label>Client ID</label>
           <input type="text" name="client_id" value="{{ settings.client_id or '' }}"

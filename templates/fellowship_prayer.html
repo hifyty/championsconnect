@@ -10,6 +10,7 @@
     <div class="card-header"><div class="card-title">Submit Prayer Request</div></div>
     <div class="card-body">
       <form method="POST">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
           <label class="form-label">Your Name</label>
           <input type="text" name="submitter_name" class="form-control" value="{{ session.get('name','') }}" placeholder="Your name (or leave blank for Anonymous)">
@@ -39,6 +40,7 @@
             <div class="fs-sm text-slate">— {{ p.submitter_name or 'Anonymous' }} · {{ (p.created_at|string)[:10] }}</div>
             {% if session.get('role') in ['super_admin','admin'] or my_role == 'leader' %}
             <form method="POST" action="{{ url_for('fellowship_prayer_answered', fellowship_id=hf.id, pr_id=p.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm" style="background:#dcfce7;color:#16a34a;">✅ Answered</button>
             </form>
             {% endif %}

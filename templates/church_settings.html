@@ -11,6 +11,7 @@
       <div class="card-header"><div class="card-title">🏛️ Organisation Details</div></div>
       <div class="card-body">
         <form method="POST" action="{{ url_for('church_settings_page') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
             <label class="form-label">Church / Organisation Name *</label>
             <input type="text" name="org_name" class="form-control"
@@ -111,6 +112,7 @@
       <div class="card-header"><div class="card-title">🔑 Change Admin Password</div></div>
       <div class="card-body">
         <form method="POST" action="{{ url_for('admin_change_own_password') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <div class="form-group">
             <label class="form-label">Current Password</label>
             <input type="password" name="current_password" class="form-control" required>

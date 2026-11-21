@@ -7,6 +7,7 @@
       <button class="modal-close" onclick="closeModal('transferModal')">✕</button>
     </div>
     <form method="POST" action="{{ url_for('fellowship_transfer_request') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Transfer To *</label>
@@ -240,6 +241,7 @@
             <div class="fs-sm fw-bold" style="color:#92400e;">⏳ Pending Transfer Request</div>
             <div class="fs-sm text-slate">To: {{ pending_transfer.to_name }} — {{ pending_transfer.reason or 'No reason given' }}</div>
             <form method="POST" action="{{ url_for('fellowship_transfer_cancel', req_id=pending_transfer.id) }}" style="margin-top:8px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <button type="submit" class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;">Cancel Request</button>
             </form>
           </div>
@@ -266,6 +268,9 @@
         <a href="{{ url_for('change_password') }}" class="btn btn-outline w-100" style="justify-content:center;margin-bottom:10px;">
           🔑 Change Password
         </a>
+        <button type="button" class="btn btn-outline w-100" style="justify-content:center;margin-bottom:10px;color:#b91c1c;border-color:#fecaca;" onclick="openModal('deleteAccountModal')">
+          🗑️ Delete My Account
+        </button>
         <div style="font-size:0.78rem;color:var(--slate);margin-top:8px;">
           Mailing list: 
           <span class="badge {% if member.on_mailing_list %}badge-active{% else %}badge-inactive{% endif %}">
@@ -274,6 +279,35 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- DELETE ACCOUNT MODAL -->
+<div class="modal-overlay" id="deleteAccountModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🗑️ Delete My Account</div>
+      <button class="modal-close" onclick="closeModal('deleteAccountModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('delete_my_account') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <p class="fs-sm" style="margin-bottom:14px;">
+          This removes your login access and personal contact details from Champions Connect.
+          Your giving/donation history stays on file — we're required to keep those records for
+          CRA tax receipt purposes even after an account is closed, same as any charity would.
+          This cannot be undone from the app; contact an admin if you need it reversed.
+        </p>
+        <div class="form-group">
+          <label>Confirm your password</label>
+          <input type="password" name="password" required placeholder="••••••••">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('deleteAccountModal')">Cancel</button>
+        <button type="submit" class="btn" style="background:#b91c1c;color:#fff;">Delete My Account</button>
+      </div>
+    </form>
   </div>
 </div>
 

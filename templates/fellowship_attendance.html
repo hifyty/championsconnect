@@ -48,6 +48,7 @@
       <button onclick="closeModal('newSessionModal')" class="modal-close">✕</button>
     </div>
     <form method="POST" action="{{ url_for('fellowship_attendance_new', fellowship_id=hf.id) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="grid-2">
           <div class="form-group">
