@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prayer Band · Champions Connect</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='icons/favicon-32.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+  <meta name="theme-color" content="#1a2744">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icons/apple-touch-icon.png') }}">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Champions">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --navy: #1a2744; --gold: #c9a84c; --accent: #0f766e; --slate: #64748b; --ivory: #faf8f2;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      min-height: 100vh;
+      background: var(--navy);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 480px;
+      background: var(--ivory);
+      border-radius: 20px;
+      padding: 40px 36px;
+    }
+    .brand { margin-bottom: 24px; }
+    .badge-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 48px; height: 48px; border-radius: 12px;
+      background: rgba(15,118,110,.14);
+      font-size: 1.4rem; margin-bottom: 14px;
+    }
+    h1 { font-family: 'Playfair Display', serif; font-size: 1.7rem; color: var(--navy); margin-bottom: 8px; }
+    .subtitle { font-size: 0.9rem; color: var(--slate); margin-bottom: 20px; line-height: 1.6; }
+
+    .meet-box {
+      background: rgba(15,118,110,.07);
+      border: 1px solid rgba(15,118,110,.18);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 0.86rem;
+      color: var(--navy);
+      margin-bottom: 26px;
+      line-height: 1.5;
+    }
+    .meet-box strong { display: block; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 4px; }
+
+    .section-label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;
+      color: var(--slate); margin: 22px 0 10px;
+    }
+    .item {
+      padding: 10px 0;
+      border-bottom: 1px solid #e7e2d6;
+    }
+    .item:last-child { border-bottom: none; }
+    .item-title { font-size: 0.92rem; font-weight: 600; color: var(--navy); margin-bottom: 2px; }
+    .item-meta { font-size: 0.78rem; color: var(--slate); }
+    .item-body { font-size: 0.85rem; color: var(--slate); margin-top: 4px; line-height: 1.5; }
+    .empty { font-size: 0.85rem; color: var(--slate); font-style: italic; padding: 6px 0; }
+
+    .cta-row { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; }
+    .btn-give {
+      width: 100%; padding: 14px; background: var(--gold); color: var(--navy); border: none;
+      border-radius: 10px; font-size: 0.95rem; font-weight: 700; cursor: pointer; text-align: center;
+      text-decoration: none; display: block;
+    }
+    .btn-give:hover { background: #d9bb5e; }
+    .btn-outline {
+      width: 100%; padding: 13px; background: transparent; color: var(--navy);
+      border: 1.5px solid var(--navy); border-radius: 10px;
+      font-size: 0.92rem; font-weight: 600; text-align: center; text-decoration: none; display: block;
+    }
+    .btn-outline:hover { background: rgba(26,39,68,.05); }
+
+    .note { font-size: 0.78rem; color: var(--slate); margin-top: 22px; line-height: 1.6; text-align: center; }
+    .note a { color: var(--navy); font-weight: 600; text-decoration: none; }
+    .note a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <img src="{{ url_for('static', filename='img/logo-horizontal-color.png') }}" alt="{{ settings.org_name or 'Champions Parish' }}" style="height:32px;width:auto;">
+    </div>
+
+    <div class="badge-icon">🙏</div>
+    <h1>Prayer Band</h1>
+    <p class="subtitle">Dedicated to intercession — standing in the gap in prayer for the church and community.</p>
+
+    <div class="meet-box">
+      <strong>When We Meet</strong>
+      Meeting days and times for this ministry are being finalized — check the <a href="{{ url_for('contact_page') }}">Contact Us</a> page or reach out and we'll point you in the right direction.
+    </div>
+
+    <div class="section-label">Upcoming</div>
+    {% if upcoming %}
+      {% for ev in upcoming %}
+      <div class="item">
+        <div class="item-title">{{ ev.title }}</div>
+        <div class="item-meta">
+          {{ ev.event_date }}{% if ev.start_time %} · {{ ev.start_time }}{% endif %}{% if ev.location %} · {{ ev.location }}{% endif %}
+        </div>
+        {% if ev.description %}<div class="item-body">{{ ev.description }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">No upcoming Prayer Band events posted yet — check back soon.</div>
+    {% endif %}
+
+    <div class="section-label">Announcements</div>
+    {% if posts %}
+      {% for p in posts %}
+      <div class="item">
+        <div class="item-title">{{ p.title }}</div>
+        <div class="item-body">{{ p.body }}</div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">Nothing posted yet — check back soon.</div>
+    {% endif %}
+
+    <div class="cta-row">
+      {% if give_category %}
+      <a class="btn-give" href="{{ url_for('giving.give_page', category_id=give_category.id) }}" data-open-external>💛 Give to Prayer Band</a>
+      {% else %}
+      <a class="btn-give" href="{{ url_for('giving.give_page') }}" data-open-external>💳 Give Online</a>
+      {% endif %}
+      {% if not is_logged_in %}
+      <a class="btn-outline" href="{{ url_for('login') }}">Log In to Champions Connect</a>
+      {% else %}
+      <a class="btn-outline" href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+      {% endif %}
+    </div>
+
+    <p class="note"><a href="{{ url_for('ministries_page') }}">Ministries</a> · <a href="{{ url_for('public_calendar') }}">Events</a> · <a href="{{ url_for('public_updates') }}">News</a></p>
+    <p class="note"><a href="{{ url_for('contact_page') }}">Contact Us</a> · Champions Connect</p>
+  </div>
+<script src="{{ url_for('static', filename='js/capacitor-bridge.js') }}"></script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+  });
+}
+</script>
+</body>
+</html>

@@ -955,6 +955,21 @@ def init_db():
     except Exception:
         pass
 
+    # Migration: seed giving categories for the other 4 ministry pages
+    for cat_name, cat_desc, cat_color in [
+        ('Teenagers\' Ministry', 'Giving designated for the Teenagers\' Ministry', '#2563eb'),
+        ('Men of Valour',        'Giving designated for the Men of Valour ministry', '#334155'),
+        ('Women of Zion',        'Giving designated for the Women of Zion ministry', '#be185d'),
+        ('Prayer Band',          'Giving designated for the Prayer Band ministry', '#0f766e'),
+    ]:
+        try:
+            if not _exec(db, "SELECT id FROM finance_categories WHERE name=?", [cat_name]).fetchone():
+                _exec(db, "INSERT INTO finance_categories (name,description,color) VALUES (?,?,?)",
+                      (cat_name, cat_desc, cat_color))
+                db.commit()
+        except Exception:
+            pass
+
     # Migration: add new columns to users if they don't exist yet
     for col, definition in [
         ('has_seen_welcome',      'INTEGER DEFAULT 0'),
@@ -1009,6 +1024,20 @@ def init_db():
             voter_token TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(question_id, voter_token)
+        );
+
+        -- CONTACT PAGE FAQ BOT -- simple keyword-matched FAQ today; the
+        -- matching logic lives in one place (answer_faq_question() in
+        -- app.py) so it can be swapped for an AI model later without
+        -- changing this schema, the /api/faq-bot route, or the widget.
+        CREATE TABLE IF NOT EXISTS faq_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question TEXT NOT NULL,
+            answer TEXT NOT NULL,
+            keywords TEXT,
+            display_order INTEGER DEFAULT 0,
+            is_active INTEGER DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
 
         -- CHILDREN'S MINISTRY -- Phase 6
@@ -1075,6 +1104,43 @@ def init_db():
             UNIQUE(child_id, session_date)
         );
     """)
+
+    # Migration: seed a starter set of FAQ bot entries if the table is empty.
+    # Admins can add/edit/remove these from Contact Page FAQs in the sidebar.
+    try:
+        if _exec(db, "SELECT COUNT(*) as c FROM faq_entries").fetchone()['c'] == 0:
+            starter_faqs = [
+                ("How do I become a member?",
+                 "Welcome! You can create a free account from the Log In page (tap \"Sign Up\"). "
+                 "Your account activates immediately -- no waiting for approval.",
+                 "member membership join account signup register", 1),
+                ("How do I join a House Fellowship?",
+                 "Once you're logged in, go to My Portal and tap \"Request to Join a Fellowship.\" "
+                 "A fellowship leader or admin will review your request.",
+                 "fellowship house group join small", 2),
+                ("How can I give or donate online?",
+                 "Tap the \"Give Online\" button on this page, or on your Dashboard once logged in. "
+                 "Giving is processed securely by Stripe.", 
+                 "give giving donate donation tithe offering pay stripe", 3),
+                ("I'm interested in the choir -- how do I get involved?",
+                 "Choir members are linked to the Choir Hub by a Choir Admin. Reach out to us using the "
+                 "contact details on this page and we'll connect you with the choir team.",
+                 "choir sing singing music duty roster", 4),
+                ("Do you have a ministry for young adults or teens?",
+                 "Yes! Visit the Ministries page to see Zoe Young Adults, Teenagers' Ministry, Men of "
+                 "Valour, Women of Zion and Prayer Band -- each has its own page with more detail.",
+                 "ministry ministries youth teen teenager young adult ", 5),
+                ("How do I reset or change my password?",
+                 "If you're logged in, go to your Dashboard and tap \"Change Password.\" If you're locked "
+                 "out, use the contact details on this page to reach an admin.",
+                 "password reset forgot login locked", 6),
+            ]
+            for q, a, kw, order in starter_faqs:
+                _exec(db, "INSERT INTO faq_entries (question,answer,keywords,display_order) VALUES (?,?,?,?)",
+                      (q, a, kw, order))
+            db.commit()
+    except Exception:
+        pass
 
     # Social settings stubs
     if _exec(db, "SELECT COUNT(*) as c FROM social_settings").fetchone()['c'] == 0:
@@ -1222,6 +1288,33 @@ def super_admin_required(f):
         if 'user_id' not in session: return redirect(url_for('login'))
         if not is_super_admin():
             flash('Access denied — super admin only.','danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+def directory_view_required(f):
+    """View the Member Directory (list/detail/JSON). Super Admin, Finance
+    Admin, and Choir Admin -- Choir Admin gets view-only, not add/edit/delete
+    (see directory_edit_required below). Everyone else (Content Admin,
+    Events Admin, plain members) loses directory access entirely, per
+    QA feedback that it was too widely reachable."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session: return redirect(url_for('login'))
+        if not (is_finance_admin() or is_choir_admin()):
+            flash('Access denied — you do not have permission to view the member directory.','danger')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+def directory_edit_required(f):
+    """Add/edit/delete a member record. Super Admin + Finance Admin only --
+    narrower than directory_view_required on purpose."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if 'user_id' not in session: return redirect(url_for('login'))
+        if not is_finance_admin():
+            flash('Access denied — only Super Admin or Finance Admin can add, edit, or remove member records.','danger')
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated
@@ -1556,7 +1649,7 @@ def members_json():
     return jsonify([dict(m) for m in members])
 
 @app.route('/members')
-@login_required
+@directory_view_required
 def members():
     search = request.args.get('search','')
     status = request.args.get('status','active')
@@ -1569,7 +1662,7 @@ def members():
     return render_template('members.html', members=query_db(q,params), search=search, status=status)
 
 @app.route('/members/add', methods=['GET','POST'])
-@login_required
+@directory_edit_required
 def add_member():
     if request.method == 'POST':
         email = request.form.get('email','').strip()
@@ -1588,7 +1681,7 @@ def add_member():
     return render_template('member_form.html', member=None)
 
 @app.route('/members/<int:member_id>')
-@login_required
+@directory_view_required
 def member_detail(member_id):
     member = query_db("SELECT * FROM members WHERE id=?", [member_id], one=True)
     if not member:
@@ -1600,7 +1693,7 @@ def member_detail(member_id):
     return render_template('member_detail.html', member=member, duties=duties, donations=donations, total_given=total_given)
 
 @app.route('/members/<int:member_id>/edit', methods=['GET','POST'])
-@login_required
+@directory_edit_required
 def edit_member(member_id):
     member = query_db("SELECT * FROM members WHERE id=?", [member_id], one=True)
     if not member:
@@ -1621,7 +1714,7 @@ def edit_member(member_id):
     return render_template('member_form.html', member=member)
 
 @app.route('/members/<int:member_id>/delete', methods=['POST'])
-@admin_required
+@directory_edit_required
 def delete_member(member_id):
     execute_db("DELETE FROM members WHERE id=?", [member_id])
     flash('Member removed.','info'); return redirect(url_for('members'))
@@ -4178,7 +4271,7 @@ def fellowship_transfer_request():
     execute_db(
         'INSERT INTO fellowship_transfer_requests (member_id, from_fellowship_id, to_fellowship_id, reason) VALUES (?,?,?,?)',
         [member['id'], from_id, to_id, reason])
-    flash('Transfer request submitted! A leader or admin will review it shortly. 🙏', 'success')
+    flash('Request submitted! A leader or admin will review it shortly. 🙏', 'success')
     return redirect(url_for('member_portal'))
 
 
@@ -4363,6 +4456,65 @@ def young_adults_page():
                             is_logged_in=('user_id' in session))
 
 
+@app.route('/ministries/teenagers')
+def teenagers_page():
+    """Public: Teenagers' Ministry page -- same pattern as /young-adults.
+    Admins tag an event 'Teenagers\' Ministry' in Event Type, or a news
+    post 'teens' in its category, and it shows up here automatically."""
+    upcoming = query_db(
+        "SELECT * FROM events WHERE event_type=? AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5",
+        ["Teenagers' Ministry"])
+    posts = query_db(
+        "SELECT * FROM news_posts WHERE category='teens' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
+    give_category = query_db("SELECT * FROM finance_categories WHERE name=?", ["Teenagers' Ministry"], one=True)
+    settings = get_church_settings()
+    return render_template('ministry_teenagers.html', upcoming=upcoming, posts=posts,
+                            give_category=give_category, settings=settings,
+                            is_logged_in=('user_id' in session))
+
+
+@app.route('/ministries/men-of-valour')
+def men_of_valour_page():
+    """Public: Men of Valour ministry page -- same pattern as /young-adults."""
+    upcoming = query_db(
+        "SELECT * FROM events WHERE event_type='Men of Valour' AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5")
+    posts = query_db(
+        "SELECT * FROM news_posts WHERE category='valour' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
+    give_category = query_db("SELECT * FROM finance_categories WHERE name='Men of Valour'", one=True)
+    settings = get_church_settings()
+    return render_template('ministry_men_of_valour.html', upcoming=upcoming, posts=posts,
+                            give_category=give_category, settings=settings,
+                            is_logged_in=('user_id' in session))
+
+
+@app.route('/ministries/women-of-zion')
+def women_of_zion_page():
+    """Public: Women of Zion ministry page -- same pattern as /young-adults."""
+    upcoming = query_db(
+        "SELECT * FROM events WHERE event_type='Women of Zion' AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5")
+    posts = query_db(
+        "SELECT * FROM news_posts WHERE category='zion' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
+    give_category = query_db("SELECT * FROM finance_categories WHERE name='Women of Zion'", one=True)
+    settings = get_church_settings()
+    return render_template('ministry_women_of_zion.html', upcoming=upcoming, posts=posts,
+                            give_category=give_category, settings=settings,
+                            is_logged_in=('user_id' in session))
+
+
+@app.route('/ministries/prayer-band')
+def prayer_band_page():
+    """Public: Prayer Band ministry page -- same pattern as /young-adults."""
+    upcoming = query_db(
+        "SELECT * FROM events WHERE event_type='Prayer Band' AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5")
+    posts = query_db(
+        "SELECT * FROM news_posts WHERE category='prayerband' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
+    give_category = query_db("SELECT * FROM finance_categories WHERE name='Prayer Band'", one=True)
+    settings = get_church_settings()
+    return render_template('ministry_prayer_band.html', upcoming=upcoming, posts=posts,
+                            give_category=give_category, settings=settings,
+                            is_logged_in=('user_id' in session))
+
+
 @app.route('/privacy')
 def privacy_page():
     """Public privacy policy -- required for both app store listings."""
@@ -4380,6 +4532,147 @@ def contact_page():
     settings = get_church_settings()
     return render_template('contact.html', settings=settings,
                             is_logged_in=('user_id' in session))
+
+
+# ─────────────────────────────────────────────
+# CONTACT PAGE FAQ BOT
+#
+# v1 is a simple keyword-matched FAQ, by design (see QA feedback thread).
+# answer_faq_question() is the ONE place that decides what to say back --
+# everything else (the /api/faq-bot route, the widget's fetch call, the
+# faq_entries table) is just plumbing around it. To upgrade to an
+# AI-powered bot later, swap the body of this function for a model call
+# that's given the same `message` string and the same church_settings /
+# faq_entries context, and keep returning a plain answer string. Nothing
+# else needs to change.
+# ─────────────────────────────────────────────
+
+def answer_faq_question(message):
+    """Return a plain-text answer for a visitor's typed question.
+
+    Checks a small set of "live" intents first (service time, address,
+    phone, email) so those never go stale even if the wording in
+    faq_entries drifts -- they're always pulled straight from Church
+    Settings. Everything else is matched against the admin-editable
+    faq_entries table by simple keyword overlap. Falls back to a
+    friendly "ask a human" message if nothing matches well.
+    """
+    msg = (message or '').strip().lower()
+    if not msg:
+        return "Go ahead and type your question and I'll do my best to help!"
+
+    settings = get_church_settings()
+
+    def has_any(*words):
+        return any(w in msg for w in words)
+
+    # ── Live intents, answered straight from Church Settings ──
+    if has_any('service time', 'what time', 'when is service', 'when do you meet',
+               'sunday service', 'service start', 'what time is church'):
+        if settings.get('service_times') if hasattr(settings, 'get') else settings['service_times']:
+            return f"Our main service time is: {settings['service_times']}. Looking for a ministry meeting time instead? Check that ministry's page under Ministries."
+        return "We haven't published our main service time here yet -- please reach out using the Phone or Email on this page and we'll let you know."
+
+    if has_any('address', 'located', 'location', 'where are you', 'where is', 'directions'):
+        if settings['org_address']:
+            return f"You'll find us at {settings['org_address']}. Tap \"Open in Google Maps\" on this page for directions."
+        return "Our address isn't published here yet -- please reach out using the Phone or Email on this page."
+
+    if has_any('phone', 'call you', 'phone number'):
+        if settings['phone']:
+            return f"You can call us at {settings['phone']}."
+        return "We haven't published a phone number yet -- please reach out by email instead."
+
+    if has_any('email', 'e-mail'):
+        if settings['admin_email']:
+            return f"You can reach us by email at {settings['admin_email']}."
+        return "We haven't published an email address yet -- please use the Phone number on this page."
+
+    # ── Admin-editable FAQ table, matched by keyword overlap ──
+    msg_words = set(w.strip('?.,!') for w in msg.split() if len(w.strip('?.,!')) > 2)
+    best_entry, best_score = None, 0
+    for entry in query_db("SELECT * FROM faq_entries WHERE is_active=1 ORDER BY display_order ASC"):
+        entry_words = set((entry['keywords'] or '').lower().split())
+        entry_words |= set(w.strip('?.,!') for w in entry['question'].lower().split() if len(w.strip('?.,!')) > 2)
+        score = len(msg_words & entry_words)
+        if score > best_score:
+            best_entry, best_score = entry, score
+
+    if best_entry and best_score > 0:
+        return best_entry['answer']
+
+    return ("I'm not sure I have an answer for that yet. Try asking about membership, "
+            "House Fellowships, giving, choir, ministries, or your password -- or reach out "
+            "using the Phone or Email on this page and a real person will help.")
+
+
+@app.route('/api/faq-bot', methods=['POST'])
+@csrf.exempt  # called via fetch() from the public Contact Us page -- there's
+              # no login session for a CSRF token to protect; rate-limited
+              # below instead to prevent abuse.
+@limiter.limit("20 per minute")
+def faq_bot():
+    data = request.get_json(silent=True) or {}
+    message = (data.get('message') or request.form.get('message') or '')[:300]
+    answer = answer_faq_question(message)
+    return jsonify({'answer': answer})
+
+
+@app.route('/admin/faq')
+@content_required
+def faq_admin():
+    """Manage the Contact Page FAQ bot's canned Q&A entries."""
+    entries = query_db("SELECT * FROM faq_entries ORDER BY display_order ASC, id ASC")
+    return render_template('faq_admin.html', entries=entries)
+
+
+@app.route('/admin/faq/add', methods=['POST'])
+@content_required
+def faq_add():
+    question = request.form.get('question','').strip()
+    answer   = request.form.get('answer','').strip()
+    keywords = request.form.get('keywords','').strip()
+    order    = request.form.get('display_order','0').strip() or '0'
+    if not question or not answer:
+        flash('Question and answer are both required.','danger')
+        return redirect(url_for('faq_admin'))
+    execute_db("INSERT INTO faq_entries (question,answer,keywords,display_order) VALUES (?,?,?,?)",
+               [question, answer, keywords, int(order)])
+    flash('FAQ added.','success')
+    return redirect(url_for('faq_admin'))
+
+
+@app.route('/admin/faq/<int:faq_id>/edit', methods=['POST'])
+@content_required
+def faq_edit(faq_id):
+    question = request.form.get('question','').strip()
+    answer   = request.form.get('answer','').strip()
+    keywords = request.form.get('keywords','').strip()
+    order    = request.form.get('display_order','0').strip() or '0'
+    if not question or not answer:
+        flash('Question and answer are both required.','danger')
+        return redirect(url_for('faq_admin'))
+    execute_db("UPDATE faq_entries SET question=?, answer=?, keywords=?, display_order=? WHERE id=?",
+               [question, answer, keywords, int(order), faq_id])
+    flash('FAQ updated.','success')
+    return redirect(url_for('faq_admin'))
+
+
+@app.route('/admin/faq/<int:faq_id>/toggle', methods=['POST'])
+@content_required
+def faq_toggle(faq_id):
+    entry = query_db("SELECT * FROM faq_entries WHERE id=?", [faq_id], one=True)
+    if entry:
+        execute_db("UPDATE faq_entries SET is_active=? WHERE id=?", [0 if entry['is_active'] else 1, faq_id])
+    return redirect(url_for('faq_admin'))
+
+
+@app.route('/admin/faq/<int:faq_id>/delete', methods=['POST'])
+@content_required
+def faq_delete(faq_id):
+    execute_db("DELETE FROM faq_entries WHERE id=?", [faq_id])
+    flash('FAQ removed.','success')
+    return redirect(url_for('faq_admin'))
 
 
 @app.route('/admin/change-password', methods=['POST'])

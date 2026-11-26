@@ -3,7 +3,7 @@
 {% block page_title %}Member Directory{% endblock %}
 
 {% block topbar_actions %}
-{% if session.get('role') in ['super_admin','admin','choir_admin','finance_admin','content_admin','events_admin'] %}
+{% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}
 <a href="{{ url_for('add_member') }}" class="btn btn-gold">+ Add Member</a>
 {% endif %}
 {% endblock %}
@@ -40,7 +40,7 @@
       <div class="badges" style="margin-top:6px;">
         <span class="badge badge-{{ m.status }}">{{ m.status | replace('_',' ') | title }}</span>
       </div>
-      {% if session.get('role') in ['super_admin','admin','choir_admin','finance_admin','content_admin','events_admin'] %}
+      {% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}
       <div style="margin-top:10px;display:flex;gap:6px;">
         <a href="{{ url_for('member_detail', member_id=m.id) }}" class="btn btn-sm btn-primary">View</a>
         <a href="{{ url_for('edit_member', member_id=m.id) }}" class="btn btn-sm btn-outline">Edit</a>
@@ -56,7 +56,7 @@
   <div class="icon">👥</div>
   <h3>No members found</h3>
   <p>Try adjusting your search or
-    {% if session.get('role') in ['super_admin','admin'] %}
+    {% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}
     <a href="{{ url_for('add_member') }}" style="color:var(--navy);font-weight:700;">add a new member</a>.
     {% else %}contact an admin.{% endif %}
   </p>

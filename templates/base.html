@@ -42,15 +42,19 @@
     <a href="{{ url_for('contact_page') }}" class="nav-link {% if request.endpoint=='contact_page' %}active{% endif %}">
       <span class="nav-icon">📞</span> <span>Contact Us</span>
     </a>
-    <a href="{{ url_for('young_adults_page') }}" class="nav-link {% if request.endpoint=='young_adults_page' %}active{% endif %}">
-      <span class="nav-icon">🧑‍🤝‍🧑</span> <span>Zoe Young Adults</span>
+    {% if session.get('role') in ['super_admin','admin','content_admin'] %}
+    <a href="{{ url_for('faq_admin') }}" class="nav-link {% if request.endpoint in ['faq_admin','faq_add','faq_edit'] %}active{% endif %}">
+      <span class="nav-icon">💬</span> <span>Contact Page FAQs</span>
     </a>
+    {% endif %}
     <a href="{{ url_for('ministries_page') }}" class="nav-link {% if request.endpoint=='ministries_page' %}active{% endif %}">
       <span class="nav-icon">⛪</span> <span>Ministries</span>
     </a>
 
-    <!-- PEOPLE — all admins -->
-    {% set _sa = session.get('role') in ['super_admin','admin'] %}{% if _sa %}
+    <!-- PEOPLE — directory: super admin, finance admin, choir admin (view only) -->
+    {% set _sa = session.get('role') in ['super_admin','admin'] %}
+    {% set _can_view_directory = session.get('role') in ['super_admin','admin','finance_admin','finance','choir_admin'] %}
+    {% if _sa %}
     <div class="nav-section-label">People</div>
     <a href="{{ url_for('members') }}" class="nav-link {% if 'member' in request.endpoint and request.endpoint != 'member_portal' %}active{% endif %}">
       <span class="nav-icon">👥</span> <span>Member Directory</span>
@@ -58,7 +62,7 @@
     <a href="{{ url_for('admin_users') }}" class="nav-link {% if request.endpoint=='admin_users' %}active{% endif %}">
       <span class="nav-icon">🔑</span> <span>Users & Roles</span>
     </a>
-    {% elif session.get('role') in ['choir_admin','finance_admin','finance','content_admin','events_admin'] %}
+    {% elif _can_view_directory %}
     <div class="nav-section-label">People</div>
     <a href="{{ url_for('members') }}" class="nav-link {% if 'member' in request.endpoint and request.endpoint != 'member_portal' %}active{% endif %}">
       <span class="nav-icon">👥</span> <span>Member Directory</span>
@@ -163,7 +167,6 @@
         <div class="role">{{ {'super_admin':'Super Admin','finance_admin':'Finance Admin','choir_admin':'Choir Admin','content_admin':'Content Admin','events_admin':'Events Admin','member':'Member'}.get(current_user.role, current_user.role|title) }}</div>
       </div>
     </div>
-    <a href="{{ url_for('logout') }}" class="btn btn-outline w-100" style="font-size:0.78rem;">⬅ Logout</a>
     {% endif %}
   </div>
 </aside>

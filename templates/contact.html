@@ -22,18 +22,52 @@
       font-family: 'Inter', sans-serif;
       min-height: 100vh;
       background: var(--navy);
-      display: flex; align-items: center; justify-content: center;
       padding: 24px;
     }
-    .card {
-      width: 100%; max-width: 480px;
-      background: var(--ivory);
-      border-radius: 20px;
-      padding: 40px 36px;
+    .wrap { max-width: 920px; margin: 0 auto; }
+
+    /* HERO */
+    .hero {
+      position: relative; overflow: hidden;
+      background: linear-gradient(135deg, var(--navy), #243560);
+      border-radius: 20px 20px 0 0;
+      padding: 44px 40px 36px;
+      text-align: center;
     }
-    .brand { margin-bottom: 28px; }
-    h1 { font-family: 'Playfair Display', serif; font-size: 1.6rem; color: var(--navy); margin-bottom: 6px; }
-    .subtitle { font-size: 0.88rem; color: var(--slate); margin-bottom: 28px; line-height: 1.5; }
+    .hero::before {
+      content: ''; position: absolute; top: -100px; right: -100px; width: 320px; height: 320px;
+      border-radius: 50%; background: radial-gradient(circle, rgba(201,168,76,.18) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero::after {
+      content: ''; position: absolute; bottom: -90px; left: -90px; width: 260px; height: 260px;
+      border-radius: 50%; background: radial-gradient(circle, rgba(201,168,76,.12) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-inner { position: relative; z-index: 1; }
+    .hero img { height: 38px; width: auto; margin-bottom: 20px; }
+    .hero h1 { font-family: 'Playfair Display', serif; font-size: 2rem; color: #fff; margin-bottom: 10px; }
+    .hero h1 span { color: var(--gold); }
+    .hero p { font-size: 0.92rem; color: rgba(255,255,255,.65); max-width: 480px; margin: 0 auto; line-height: 1.6; }
+
+    /* BODY GRID */
+    .body-grid {
+      background: var(--ivory);
+      border-radius: 0 0 20px 20px;
+      padding: 36px 40px 40px;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 32px;
+    }
+    @media (max-width: 680px) {
+      .body-grid { grid-template-columns: 1fr; padding: 28px 22px 32px; }
+      .hero { padding: 36px 24px 30px; border-radius: 20px 20px 0 0; }
+    }
+
+    .section-label {
+      font-size: 0.72rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+      color: var(--gold); margin-bottom: 16px;
+    }
 
     .info-row {
       display: flex; align-items: flex-start; gap: 14px;
@@ -42,11 +76,14 @@
     }
     .info-row:last-of-type { border-bottom: none; }
     .info-icon {
-      width: 34px; height: 34px; border-radius: 9px; flex-shrink: 0;
-      background: rgba(26,39,68,.06);
+      width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
       display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
+      font-size: 17px;
     }
+    .info-icon.c-address { background: rgba(201,168,76,.16); }
+    .info-icon.c-email   { background: rgba(37,99,235,.12); }
+    .info-icon.c-phone   { background: rgba(15,118,110,.12); }
+    .info-icon.c-time    { background: rgba(139,92,246,.12); }
     .info-label {
       font-size: 0.7rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase;
       color: var(--slate); margin-bottom: 3px;
@@ -55,15 +92,48 @@
     .info-value a { color: var(--navy); text-decoration: none; font-weight: 600; }
     .info-value a:hover { text-decoration: underline; }
     .info-placeholder { font-size: 0.85rem; color: var(--slate); font-style: italic; }
+    .info-sub { font-size: 0.78rem; color: var(--slate); margin-top: 4px; }
+    .info-sub a { color: var(--navy); font-weight: 600; text-decoration: none; }
+    .info-sub a:hover { text-decoration: underline; }
 
-    .social-row { display: flex; gap: 10px; margin-top: 20px; }
+    .social-row { display: flex; gap: 10px; margin-top: 18px; }
     .social-btn {
       flex: 1; text-align: center; padding: 11px 10px;
       border: 1.5px solid #dde3ec; border-radius: 10px;
       font-size: 0.82rem; font-weight: 600; color: var(--navy);
-      text-decoration: none;
+      text-decoration: none; transition: border-color .15s;
     }
     .social-btn:hover { border-color: var(--navy); }
+
+    /* RIGHT COLUMN — FIND US CARD */
+    .find-us {
+      background: var(--navy);
+      border-radius: 16px;
+      padding: 26px 24px;
+      color: #fff;
+      display: flex; flex-direction: column;
+      height: fit-content;
+    }
+    .find-us .section-label { color: var(--gold); }
+    .map-pin {
+      width: 100%; aspect-ratio: 16/10; border-radius: 12px; margin-bottom: 16px;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(201,168,76,.35) 0%, transparent 45%),
+        repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0 1px, transparent 1px 28px),
+        repeating-linear-gradient(90deg, rgba(255,255,255,.035) 0 1px, transparent 1px 28px),
+        #15213a;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2.4rem;
+    }
+    .find-us-addr { font-size: 0.88rem; color: rgba(255,255,255,.85); line-height: 1.6; margin-bottom: 16px; }
+    .find-us-addr a { color: var(--gold); text-decoration: none; font-weight: 600; }
+    .find-us-addr a:hover { text-decoration: underline; }
+    .btn-map {
+      display: block; text-align: center; padding: 12px; border-radius: 10px;
+      background: rgba(255,255,255,.08); color: #fff; text-decoration: none;
+      font-size: 0.85rem; font-weight: 600; border: 1.5px solid rgba(255,255,255,.18);
+    }
+    .btn-map:hover { background: rgba(255,255,255,.14); }
 
     .cta-row { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; }
     .btn-give {
@@ -79,96 +149,240 @@
     }
     .btn-outline:hover { background: rgba(26,39,68,.05); }
 
-    .note { font-size: 0.78rem; color: var(--slate); margin-top: 22px; line-height: 1.6; text-align: center; }
+    .note { font-size: 0.78rem; color: var(--slate); margin-top: 24px; line-height: 1.6; text-align: center; }
     .note a { color: var(--navy); font-weight: 600; text-decoration: none; }
     .note a:hover { text-decoration: underline; }
+
+    /* FAQ CHAT LAUNCHER */
+    .chat-launcher {
+      position: fixed; bottom: 24px; right: 24px; z-index: 50;
+      width: 56px; height: 56px; border-radius: 50%;
+      background: var(--gold); color: var(--navy); border: none;
+      font-size: 1.4rem; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,.25);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .chat-launcher:hover { background: #d9bb5e; }
+
+    /* FAQ CHAT PANEL */
+    .chat-panel {
+      position: fixed; bottom: 92px; right: 24px; z-index: 51;
+      width: 340px; max-width: calc(100vw - 32px);
+      height: 440px; max-height: calc(100vh - 140px);
+      background: var(--ivory); border-radius: 16px;
+      box-shadow: 0 16px 48px rgba(0,0,0,.3);
+      display: none; flex-direction: column; overflow: hidden;
+    }
+    .chat-panel.open { display: flex; }
+    .chat-head {
+      background: var(--navy); color: #fff; padding: 14px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .chat-head-title { font-size: 0.92rem; font-weight: 700; }
+    .chat-head-sub { font-size: 0.7rem; color: rgba(255,255,255,.55); margin-top: 1px; }
+    .chat-close { background: none; border: none; color: #fff; font-size: 1.1rem; cursor: pointer; opacity: .7; }
+    .chat-close:hover { opacity: 1; }
+    .chat-body { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-bubble { max-width: 85%; padding: 9px 12px; border-radius: 12px; font-size: 0.84rem; line-height: 1.5; }
+    .chat-bubble.bot  { align-self: flex-start; background: #fff; color: var(--navy); border: 1px solid #e7e2d6; border-bottom-left-radius: 3px; }
+    .chat-bubble.user { align-self: flex-end; background: var(--navy); color: #fff; border-bottom-right-radius: 3px; }
+    .chat-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 14px 10px; }
+    .chat-chip {
+      font-size: 0.74rem; padding: 6px 10px; border-radius: 999px;
+      border: 1px solid #dde3ec; background: #fff; color: var(--navy);
+      cursor: pointer;
+    }
+    .chat-chip:hover { border-color: var(--navy); }
+    .chat-input-row { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid #e7e2d6; background: #fff; }
+    .chat-input-row input {
+      flex: 1; border: 1.5px solid #dde3ec; border-radius: 10px; padding: 9px 12px;
+      font-size: 0.85rem; font-family: 'Inter', sans-serif; outline: none;
+    }
+    .chat-input-row input:focus { border-color: var(--navy); }
+    .chat-send {
+      border: none; background: var(--gold); color: var(--navy); border-radius: 10px;
+      padding: 0 14px; font-weight: 700; cursor: pointer; font-size: 0.85rem;
+    }
+    .chat-send:hover { background: #d9bb5e; }
+    .chat-typing { font-size: 0.78rem; color: var(--slate); font-style: italic; padding: 0 2px; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="brand">
-      <img src="{{ url_for('static', filename='img/logo-horizontal-color.png') }}" alt="{{ settings.org_name or 'Champions Parish' }}" style="height:34px;width:auto;">
+  <div class="wrap">
+    <div class="hero">
+      <div class="hero-inner">
+        <img src="{{ url_for('static', filename='img/logo-horizontal-white.png') }}" alt="{{ settings.org_name or 'Champions Parish' }}">
+        <h1>Get in <span>Touch</span></h1>
+        <p>We'd love to connect with you — come visit us, reach out, or follow along online.</p>
+      </div>
     </div>
 
-    <h1>Get in Touch</h1>
-    <p class="subtitle">We'd love to connect with you — come visit us, reach out, or follow along online.</p>
-
-    <div class="info-row">
-      <div class="info-icon">📍</div>
+    <div class="body-grid">
       <div>
-        <div class="info-label">Address</div>
-        {% if settings.org_address %}
-        <div class="info-value">
-          <a href="https://maps.google.com/?q={{ settings.org_address | urlencode }}" target="_blank" rel="noopener">{{ settings.org_address }}</a>
+        <div class="section-label">Contact Details</div>
+
+        <div class="info-row">
+          <div class="info-icon c-address">📍</div>
+          <div>
+            <div class="info-label">Address</div>
+            {% if settings.org_address %}
+            <div class="info-value">
+              <a href="https://maps.google.com/?q={{ settings.org_address | urlencode }}" target="_blank" rel="noopener">{{ settings.org_address }}</a>
+            </div>
+            {% else %}
+            <div class="info-placeholder">Not set yet — add it in Church Settings.</div>
+            {% endif %}
+          </div>
         </div>
+
+        <div class="info-row">
+          <div class="info-icon c-email">✉️</div>
+          <div>
+            <div class="info-label">Email</div>
+            {% if settings.admin_email %}
+            <div class="info-value"><a href="mailto:{{ settings.admin_email }}">{{ settings.admin_email }}</a></div>
+            {% else %}
+            <div class="info-placeholder">Not set yet — add it in Church Settings.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-icon c-phone">📞</div>
+          <div>
+            <div class="info-label">Phone</div>
+            {% if settings.phone %}
+            <div class="info-value"><a href="tel:{{ settings.phone }}">{{ settings.phone }}</a></div>
+            {% else %}
+            <div class="info-placeholder">Not set yet — add it in Church Settings.</div>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-icon c-time">🕒</div>
+          <div>
+            <div class="info-label">Main Service Time</div>
+            {% if settings.service_times %}
+            <div class="info-value" style="white-space:pre-line;">{{ settings.service_times }}</div>
+            {% else %}
+            <div class="info-placeholder">Not set yet — add it in Church Settings.</div>
+            {% endif %}
+            <div class="info-sub">Looking for a ministry meeting time? Visit <a href="{{ url_for('ministries_page') }}">Ministries</a>.</div>
+          </div>
+        </div>
+
+        {% if settings.facebook_url or settings.instagram_url or settings.youtube_url %}
+        <div class="social-row">
+          {% if settings.facebook_url %}<a class="social-btn" href="{{ settings.facebook_url }}" target="_blank" rel="noopener">Facebook</a>{% endif %}
+          {% if settings.instagram_url %}<a class="social-btn" href="{{ settings.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
+          {% if settings.youtube_url %}<a class="social-btn" href="{{ settings.youtube_url }}" target="_blank" rel="noopener">YouTube</a>{% endif %}
+        </div>
+        {% endif %}
+
+        <div class="cta-row">
+          <a class="btn-give" href="{{ url_for('giving.give_page') }}" data-open-external>💳 Give Online</a>
+          {% if not is_logged_in %}
+          <a class="btn-outline" href="{{ url_for('login') }}">Log In to Champions Connect</a>
+          {% else %}
+          <a class="btn-outline" href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+          {% endif %}
+        </div>
+
+        <p class="note"><a href="{{ url_for('ministries_page') }}">Ministries</a> · <a href="{{ url_for('public_calendar') }}">Events</a> · <a href="{{ url_for('public_updates') }}">News</a> · <a href="{{ url_for('privacy_page') }}">Privacy</a></p>
+        <p class="note">Champions Connect · {{ settings.org_name or 'RCCG Champions Parish' }}</p>
+      </div>
+
+      <div class="find-us">
+        <div class="section-label">Find Us</div>
+        <div class="map-pin">📍</div>
+        {% if settings.org_address %}
+        <div class="find-us-addr">{{ settings.org_address }}</div>
+        <a class="btn-map" href="https://maps.google.com/?q={{ settings.org_address | urlencode }}" target="_blank" rel="noopener">Open in Google Maps →</a>
         {% else %}
-        <div class="info-placeholder">Not set yet — add it in Church Settings.</div>
+        <div class="find-us-addr" style="color:rgba(255,255,255,.5);font-style:italic;">Address not set yet.</div>
         {% endif %}
       </div>
     </div>
-
-    <div class="info-row">
-      <div class="info-icon">✉️</div>
-      <div>
-        <div class="info-label">Email</div>
-        {% if settings.admin_email %}
-        <div class="info-value"><a href="mailto:{{ settings.admin_email }}">{{ settings.admin_email }}</a></div>
-        {% else %}
-        <div class="info-placeholder">Not set yet — add it in Church Settings.</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="info-row">
-      <div class="info-icon">📞</div>
-      <div>
-        <div class="info-label">Phone</div>
-        {% if settings.phone %}
-        <div class="info-value"><a href="tel:{{ settings.phone }}">{{ settings.phone }}</a></div>
-        {% else %}
-        <div class="info-placeholder">Not set yet — add it in Church Settings.</div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="info-row">
-      <div class="info-icon">🕒</div>
-      <div>
-        <div class="info-label">Service Times</div>
-        {% if settings.service_times %}
-        <div class="info-value" style="white-space:pre-line;">{{ settings.service_times }}</div>
-        {% else %}
-        <div class="info-placeholder">Not set yet — add it in Church Settings.</div>
-        {% endif %}
-      </div>
-    </div>
-
-    {% if settings.facebook_url or settings.instagram_url or settings.youtube_url %}
-    <div class="social-row">
-      {% if settings.facebook_url %}<a class="social-btn" href="{{ settings.facebook_url }}" target="_blank" rel="noopener">Facebook</a>{% endif %}
-      {% if settings.instagram_url %}<a class="social-btn" href="{{ settings.instagram_url }}" target="_blank" rel="noopener">Instagram</a>{% endif %}
-      {% if settings.youtube_url %}<a class="social-btn" href="{{ settings.youtube_url }}" target="_blank" rel="noopener">YouTube</a>{% endif %}
-    </div>
-    {% endif %}
-
-    <div class="cta-row">
-      <a class="btn-give" href="{{ url_for('giving.give_page') }}" data-open-external>💳 Give Online</a>
-      {% if not is_logged_in %}
-      <a class="btn-outline" href="{{ url_for('login') }}">Log In to Champions Connect</a>
-      {% else %}
-      <a class="btn-outline" href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
-      {% endif %}
-    </div>
-
-    <p class="note"><a href="{{ url_for('ministries_page') }}">Ministries</a> · <a href="{{ url_for('public_calendar') }}">Events</a> · <a href="{{ url_for('public_updates') }}">News</a> · <a href="{{ url_for('privacy_page') }}">Privacy</a></p>
-    <p class="note">Champions Connect · {{ settings.org_name or 'RCCG Champions Parish' }}</p>
   </div>
+
+<!-- FAQ CHAT WIDGET -->
+<button class="chat-launcher" id="chatLauncher" onclick="toggleChat()" aria-label="Ask a question">💬</button>
+<div class="chat-panel" id="chatPanel">
+  <div class="chat-head">
+    <div>
+      <div class="chat-head-title">Ask Champions Connect</div>
+      <div class="chat-head-sub">Quick answers, any time</div>
+    </div>
+    <button class="chat-close" onclick="toggleChat()" aria-label="Close">✕</button>
+  </div>
+  <div class="chat-body" id="chatBody">
+    <div class="chat-bubble bot">Hi! 👋 Ask me about service times, our address, House Fellowships, giving, or ministries — or tap a question below.</div>
+  </div>
+  <div class="chat-chips" id="chatChips">
+    <button class="chat-chip" type="button" onclick="askChat('What time is your service?')">Service time</button>
+    <button class="chat-chip" type="button" onclick="askChat('Where are you located?')">Address</button>
+    <button class="chat-chip" type="button" onclick="askChat('How do I join a House Fellowship?')">Fellowships</button>
+    <button class="chat-chip" type="button" onclick="askChat('How can I give online?')">Giving</button>
+  </div>
+  <div class="chat-input-row">
+    <input type="text" id="chatInput" placeholder="Type your question..." onkeydown="if(event.key==='Enter')sendChat();">
+    <button class="chat-send" onclick="sendChat()">Send</button>
+  </div>
+</div>
+
 <script src="{{ url_for('static', filename='js/capacitor-bridge.js') }}"></script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/static/sw.js').catch(() => {});
   });
+}
+
+function toggleChat() {
+  document.getElementById('chatPanel').classList.toggle('open');
+}
+
+function addChatBubble(text, who) {
+  const body = document.getElementById('chatBody');
+  const b = document.createElement('div');
+  b.className = 'chat-bubble ' + who;
+  b.textContent = text;
+  body.appendChild(b);
+  body.scrollTop = body.scrollHeight;
+}
+
+function askChat(text) {
+  document.getElementById('chatInput').value = text;
+  sendChat();
+}
+
+async function sendChat() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text) return;
+  addChatBubble(text, 'user');
+  input.value = '';
+  const body = document.getElementById('chatBody');
+  const typing = document.createElement('div');
+  typing.className = 'chat-typing';
+  typing.id = 'chatTyping';
+  typing.textContent = 'Typing…';
+  body.appendChild(typing);
+  body.scrollTop = body.scrollHeight;
+  try {
+    const res = await fetch('{{ url_for("faq_bot") }}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text })
+    });
+    const data = await res.json();
+    document.getElementById('chatTyping')?.remove();
+    addChatBubble(data.answer || "Sorry, I couldn't find an answer to that.", 'bot');
+  } catch (err) {
+    document.getElementById('chatTyping')?.remove();
+    addChatBubble("Something went wrong — please try again, or reach us using the details on this page.", 'bot');
+  }
 }
 </script>
 </body>

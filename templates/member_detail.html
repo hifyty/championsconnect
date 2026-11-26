@@ -3,8 +3,10 @@
 {% block page_title %}Member Profile{% endblock %}
 
 {% block topbar_actions %}
+{% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}
 <a href="{{ url_for('edit_member', member_id=member.id) }}" class="btn btn-gold">✏️ Edit</a>
-{% if session.get('role') == 'admin' %}
+{% endif %}
+{% if session.get('role') in ['super_admin','admin','finance_admin','finance'] %}
 <form method="POST" action="{{ url_for('delete_member', member_id=member.id) }}" onsubmit="return confirm('Remove this member?');">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <button type="submit" class="btn btn-danger">🗑 Remove</button>

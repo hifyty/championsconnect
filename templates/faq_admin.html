@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Contact Page FAQs{% endblock %}
+{% block page_title %}Contact Page FAQs{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-gold" onclick="openModal('addFaqModal')">+ Add FAQ</button>
+{% endblock %}
+
+{% block content %}
+
+<!-- ADD FAQ MODAL -->
+<div class="modal-overlay" id="addFaqModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title">+ Add FAQ</div>
+      <button class="modal-close" onclick="closeModal('addFaqModal')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('faq_add') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Question *</label>
+          <input type="text" name="question" class="form-control" placeholder="e.g. How do I join a House Fellowship?" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Answer *</label>
+          <textarea name="answer" class="form-control" rows="3" placeholder="What the bot should say back..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Keywords</label>
+          <input type="text" name="keywords" class="form-control" placeholder="fellowship group join house small">
+          <div class="fs-sm text-slate" style="margin-top:4px;">Words visitors might type — used to match their question to this answer.</div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Order</label>
+          <input type="number" name="display_order" class="form-control" value="0">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Add FAQ</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal('addFaqModal')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- EDIT FAQ MODALS -->
+{% for e in entries %}
+<div class="modal-overlay" id="editFaqModal{{ e.id }}">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <div class="modal-title">Edit FAQ</div>
+      <button class="modal-close" onclick="closeModal('editFaqModal{{ e.id }}')">✕</button>
+    </div>
+    <form method="POST" action="{{ url_for('faq_edit', faq_id=e.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Question *</label>
+          <input type="text" name="question" class="form-control" value="{{ e.question }}" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Answer *</label>
+          <textarea name="answer" class="form-control" rows="3" required>{{ e.answer }}</textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Keywords</label>
+          <input type="text" name="keywords" class="form-control" value="{{ e.keywords or '' }}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Order</label>
+          <input type="number" name="display_order" class="form-control" value="{{ e.display_order }}">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="button" class="btn btn-outline" onclick="closeModal('editFaqModal{{ e.id }}')">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+
+<div class="card">
+  <div class="card-header">
+    <div class="card-title">💬 Contact Page FAQ Bot</div>
+  </div>
+  <div class="card-body">
+    <p class="fs-sm text-slate" style="margin-bottom:16px;">
+      These are the canned questions &amp; answers the FAQ bot on the public Contact Us page matches
+      against. Service time, address, phone and email are answered automatically from Church Settings —
+      everything else lives here.
+    </p>
+
+    {% if entries %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Order</th>
+          <th>Question</th>
+          <th>Answer</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in entries %}
+        <tr style="{% if not e.is_active %}opacity:0.5;{% endif %}">
+          <td class="fs-sm text-slate">{{ e.display_order }}</td>
+          <td class="fw-bold" style="max-width:220px;">{{ e.question }}</td>
+          <td class="fs-sm text-slate" style="max-width:320px;">{{ e.answer[:100] }}{% if e.answer|length > 100 %}…{% endif %}</td>
+          <td>
+            <span class="badge badge-{{ 'success' if e.is_active else 'info' }}">{{ 'Active' if e.is_active else 'Hidden' }}</span>
+          </td>
+          <td style="white-space:nowrap;">
+            <button class="btn btn-sm btn-outline" onclick="openModal('editFaqModal{{ e.id }}')">Edit</button>
+            <form method="POST" action="{{ url_for('faq_toggle', faq_id=e.id) }}" style="display:inline;">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-sm btn-outline">{{ 'Hide' if e.is_active else 'Show' }}</button>
+            </form>
+            <form method="POST" action="{{ url_for('faq_delete', faq_id=e.id) }}" style="display:inline;" onsubmit="return confirm('Delete this FAQ?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button type="submit" class="btn btn-sm btn-outline" style="color:#dc2626;border-color:#dc2626;">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="text-slate">No FAQs yet — add your first one above.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
