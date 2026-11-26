@@ -62,12 +62,31 @@
     .note a:hover { text-decoration: underline; }
     .empty-icon { font-size: 2.5rem; text-align: center; margin-bottom: 12px; }
     .empty-text { text-align: center; color: var(--slate); font-size: 0.9rem; }
+
+    .interac-box {
+      background: #fff; border: 1.5px solid #dde3ec; border-left: 4px solid var(--gold);
+      border-radius: 12px; padding: 16px 18px; margin-bottom: 20px;
+    }
+    .interac-box h3 { font-size: 0.95rem; color: var(--navy); margin-bottom: 6px; }
+    .interac-box p { font-size: 0.82rem; color: var(--slate); line-height: 1.5; margin-bottom: 8px; }
+    .interac-email { background: var(--ivory); border-radius: 8px; padding: 10px 12px; font-size: 0.85rem; font-weight: 700; color: var(--navy); margin-bottom: 8px; }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="brand">
       <img src="{{ url_for('static', filename='img/logo-horizontal-color.png') }}" alt="Champions Parish" style="height:34px;width:auto;">
+    </div>
+
+    <div class="interac-box">
+      <h3>🏦 Give by Interac e-Transfer</h3>
+      <p>Prefer e-Transfer? Send it directly from your own banking app — no fees, no account needed here.</p>
+      {% if settings.admin_email %}
+      <div class="interac-email">{{ settings.admin_email }}</div>
+      <p>Please include your name and what it's for (e.g. "Tithe") in the message field so we can record it correctly.</p>
+      {% else %}
+      <p>An e-Transfer email hasn't been published yet — check back soon, or see <a href="{{ url_for('contact_page') }}" style="color:var(--navy);font-weight:600;">Contact Us</a>.</p>
+      {% endif %}
     </div>
 
     {% if stripe_configured %}

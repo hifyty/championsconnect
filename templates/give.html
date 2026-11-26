@@ -4,6 +4,26 @@
 
 {% block content %}
 <div style="max-width:480px;">
+
+  <!-- INTERAC E-TRANSFER -->
+  <div class="card mb-2" style="border-left:4px solid var(--gold);">
+    <div class="card-header"><div class="card-title">🏦 Give by Interac e-Transfer</div></div>
+    <div class="card-body">
+      <p class="fs-sm text-slate" style="margin-bottom:10px;">
+        Prefer e-Transfer? Send it directly from your own banking app — no fees, no account needed here.
+      </p>
+      {% if settings.admin_email %}
+      <div style="background:var(--ivory2);border-radius:8px;padding:12px 14px;margin-bottom:10px;">
+        <div class="fs-sm fw-bold" style="color:var(--navy);">Send to:</div>
+        <div class="fs-sm" style="color:var(--navy);">{{ settings.admin_email }}</div>
+      </div>
+      <p class="fs-sm text-slate">Please include your name and what it's for (e.g. "Tithe" or a ministry name) in the message field so we can record it correctly.</p>
+      {% else %}
+      <p class="fs-sm text-slate">An e-Transfer email hasn't been published yet — check back soon, or see <a href="{{ url_for('contact_page') }}">Contact Us</a>.</p>
+      {% endif %}
+    </div>
+  </div>
+
   {% if stripe_configured %}
   <div class="card">
     <div class="card-header"><div class="card-title">💳 Give Online</div></div>

@@ -71,8 +71,9 @@ def give_page():
     gets give_guest.html: a standalone page (no admin sidebar) for a
     one-time gift. Recurring/monthly giving stays account-only since
     managing a subscription later needs somewhere for it to live."""
-    from app import query_db
+    from app import query_db, get_church_settings
     categories = query_db("SELECT * FROM finance_categories ORDER BY name")
+    settings = get_church_settings()
     member = _get_current_member()
     if 'user_id' in session and not member:
         # Logged in, but this account isn't linked to a member record --
@@ -80,12 +81,12 @@ def give_page():
         # keep the existing explicit warning rather than silently
         # downgrading them to the guest flow.
         return render_template('give.html',
-            stripe_configured=_stripe_configured(), categories=categories, member=None)
+            stripe_configured=_stripe_configured(), categories=categories, member=None, settings=settings)
     if member:
         return render_template('give.html',
-            stripe_configured=_stripe_configured(), categories=categories, member=member)
+            stripe_configured=_stripe_configured(), categories=categories, member=member, settings=settings)
     return render_template('give_guest.html',
-        stripe_configured=_stripe_configured(), categories=categories)
+        stripe_configured=_stripe_configured(), categories=categories, settings=settings)
 
 
 @giving_bp.route('/give/checkout', methods=['POST'])

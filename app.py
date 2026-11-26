@@ -4449,10 +4449,9 @@ def young_adults_page():
         "SELECT * FROM events WHERE event_type='Zoe Young Adults' AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5")
     posts = query_db(
         "SELECT * FROM news_posts WHERE category='zoe' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
-    zoe_category = query_db("SELECT * FROM finance_categories WHERE name='Zoe Young Adults'", one=True)
     settings = get_church_settings()
     return render_template('zoe.html', upcoming=upcoming, posts=posts,
-                            zoe_category=zoe_category, settings=settings,
+                            settings=settings,
                             is_logged_in=('user_id' in session))
 
 
@@ -4466,10 +4465,9 @@ def teenagers_page():
         ["Teenagers' Ministry"])
     posts = query_db(
         "SELECT * FROM news_posts WHERE category='teens' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
-    give_category = query_db("SELECT * FROM finance_categories WHERE name=?", ["Teenagers' Ministry"], one=True)
     settings = get_church_settings()
     return render_template('ministry_teenagers.html', upcoming=upcoming, posts=posts,
-                            give_category=give_category, settings=settings,
+                            settings=settings,
                             is_logged_in=('user_id' in session))
 
 
@@ -4480,10 +4478,9 @@ def men_of_valour_page():
         "SELECT * FROM events WHERE event_type='Men of Valour' AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5")
     posts = query_db(
         "SELECT * FROM news_posts WHERE category='valour' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
-    give_category = query_db("SELECT * FROM finance_categories WHERE name='Men of Valour'", one=True)
     settings = get_church_settings()
     return render_template('ministry_men_of_valour.html', upcoming=upcoming, posts=posts,
-                            give_category=give_category, settings=settings,
+                            settings=settings,
                             is_logged_in=('user_id' in session))
 
 
@@ -4494,10 +4491,9 @@ def women_of_zion_page():
         "SELECT * FROM events WHERE event_type='Women of Zion' AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5")
     posts = query_db(
         "SELECT * FROM news_posts WHERE category='zion' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
-    give_category = query_db("SELECT * FROM finance_categories WHERE name='Women of Zion'", one=True)
     settings = get_church_settings()
     return render_template('ministry_women_of_zion.html', upcoming=upcoming, posts=posts,
-                            give_category=give_category, settings=settings,
+                            settings=settings,
                             is_logged_in=('user_id' in session))
 
 
@@ -4508,10 +4504,9 @@ def prayer_band_page():
         "SELECT * FROM events WHERE event_type='Prayer Band' AND event_date>=date('now') ORDER BY event_date ASC LIMIT 5")
     posts = query_db(
         "SELECT * FROM news_posts WHERE category='prayerband' AND is_published=1 ORDER BY created_at DESC LIMIT 5")
-    give_category = query_db("SELECT * FROM finance_categories WHERE name='Prayer Band'", one=True)
     settings = get_church_settings()
     return render_template('ministry_prayer_band.html', upcoming=upcoming, posts=posts,
-                            give_category=give_category, settings=settings,
+                            settings=settings,
                             is_logged_in=('user_id' in session))
 
 

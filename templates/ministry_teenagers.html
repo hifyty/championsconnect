@@ -129,15 +129,10 @@
     {% endif %}
 
     <div class="cta-row">
-      {% if give_category %}
-      <a class="btn-give" href="{{ url_for('giving.give_page', category_id=give_category.id) }}" data-open-external>💛 Give to Teenagers' Ministry</a>
-      {% else %}
-      <a class="btn-give" href="{{ url_for('giving.give_page') }}" data-open-external>💳 Give Online</a>
-      {% endif %}
       {% if not is_logged_in %}
-      <a class="btn-outline" href="{{ url_for('login') }}">Log In to Champions Connect</a>
+      <a class="btn-give" href="{{ url_for('login') }}">Log In to Champions Connect</a>
       {% else %}
-      <a class="btn-outline" href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
+      <a class="btn-give" href="{{ url_for('dashboard') }}">← Back to Dashboard</a>
       {% endif %}
     </div>
 
